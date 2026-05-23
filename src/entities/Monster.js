@@ -8,6 +8,13 @@ export class Monster {
     this.repathTimer = 0;
     this.target = null;          // { x, y } в pixel
     this.speed = 100;
+    this.hp = 1;
+  }
+
+  takeDamage(n = 1) {
+    this.hp -= n;
+    if (this.hp <= 0) this.sprite.destroy();
+    return this.hp <= 0;
   }
 
   tilePos() {

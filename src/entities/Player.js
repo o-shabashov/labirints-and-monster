@@ -1,4 +1,4 @@
-import { PLAYER_SPEED, PLAYER_MAX_HP } from '../config/constants.js';
+import { PLAYER_SPEED, PLAYER_MAX_HP, FIRE_RATE_MS, STARTING_AMMO } from '../config/constants.js';
 import { applyKnockback, KNOCKBACK_DURATION, INVULNERABILITY_DURATION } from '../systems/Combat.js';
 
 export class Player {
@@ -9,6 +9,20 @@ export class Player {
     this.hp = PLAYER_MAX_HP;
     this.knockbackUntil = 0;
     this.iframesUntil = 0;
+    this.ammo = STARTING_AMMO;
+    this.nextShotAt = 0;
+    this.aim = null;
+  }
+
+  setAim(aim) { this.aim = aim; }
+
+  tryShoot(now) {
+    if (!this.aim) return null;
+    if (this.ammo <= 0) return null;
+    if (now < this.nextShotAt) return null;
+    this.ammo -= 1;
+    this.nextShotAt = now + FIRE_RATE_MS;
+    return { x: this.aim.x, y: this.aim.y, ox: this.sprite.x, oy: this.sprite.y };
   }
 
   takeHit(fromX, fromY) {

@@ -6,6 +6,7 @@ import { FogOfWar } from '../world/FogOfWar.js';
 import { Input } from '../systems/Input.js';
 import { Chaser } from '../entities/monsters/Chaser.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
+import { Bullet } from '../entities/Bullet.js';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -14,7 +15,8 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.scene.launch('UIScene');
-    this.game.events.emit('hud:update', { hp: 3 });
+
+    this.bullets = [];
 
     const seed = Date.now();
     this.map = new TileMap(this, generateMaze(GRID_W, GRID_H, seed));
@@ -84,7 +86,35 @@ export class GameScene extends Phaser.Scene {
   update(_time, delta) {
     this.inputSys.setAimOrigin(this.player.sprite.x, this.player.sprite.y);
     const input = this.inputSys.read();
+    this.player.setAim(input.aim);
     this.player.update(input);
+
+    // стрельба
+    if (input.shoot) {
+      const shot = this.player.tryShoot(this.time.now);
+      if (shot) {
+        const b = new Bullet(this, shot.ox, shot.oy, shot.x, shot.y);
+        this.physics.add.collider(b.sprite, this.map.walls, () => b.kill());
+        for (const m of this.monsters) {
+          if (!m.sprite.active) continue;
+          this.physics.add.overlap(b.sprite, m.sprite, () => {
+            if (b.dead) return;
+            b.kill();
+            if (m.takeDamage(1)) {
+              this.monsters = this.monsters.filter(x => x !== m);
+            }
+          });
+        }
+        this.bullets.push(b);
+        this.game.events.emit('hud:update', { hp: this.player.hp, ammo: this.player.ammo });
+      }
+    }
+
+    // bullet lifetime
+    const now = this.time.now;
+    for (const b of this.bullets) b.update(now);
+    this.bullets = this.bullets.filter(b => !b.dead);
+
     for (const m of this.monsters) m.update(delta, this.player, this.map);
     this.fog.update(this.player.sprite.x, this.player.sprite.y);
   }

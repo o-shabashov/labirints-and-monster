@@ -55,6 +55,12 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0xff5252, 1);
     g.fillCircle(8, 8, 6);
     g.generateTexture('pickup_heart', 16, 16);
+    g.clear();
+
+    // bullet
+    g.fillStyle(COLOR.BULLET, 1);
+    g.fillCircle(4, 4, 4);
+    g.generateTexture('bullet', 8, 8);
     g.destroy();
 
     this.scene.start('GameScene');

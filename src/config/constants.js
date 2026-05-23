@@ -40,3 +40,9 @@ export const PLAYER_MAX_HP = 3;
 export const KNOCKBACK_SPEED = 220;
 export const KNOCKBACK_MS = 200;
 export const IFRAMES_MS = 400;
+
+export const BULLET_SPEED = 500;
+export const BULLET_LIFETIME_MS = 800;
+export const FIRE_RATE_MS = 300;
+export const STARTING_AMMO = 12;
+export const MONSTER_HP_DEFAULT = 1;
