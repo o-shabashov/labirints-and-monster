@@ -56,6 +56,7 @@ export const SPRINT_MULTIPLIER = 1.6;
 export const DASH_DISTANCE = 96;      // px (3 тайла)
 export const DASH_DURATION_MS = 180;
 export const DASH_COOLDOWN_MS = 1500;
+export const DASH_STAMINA_COST = 30;  // расход stamina на рывок
 
 export const WANDERER_VISION_TILES = 4;
 export const WANDERER_LOSE_INTEREST_MS = 3000;

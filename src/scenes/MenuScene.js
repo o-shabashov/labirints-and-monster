@@ -20,7 +20,10 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // WebAudio требует user-gesture перед стартом — оба входа служат активатором.
+    let started = false;
     const start = () => {
+      if (started) return;
+      started = true;
       const sound = getSound();
       sound.resume();
       sound.startMusic();
@@ -30,18 +33,29 @@ export class MenuScene extends Phaser.Scene {
     this.pollGamepad(start);
   }
   pollGamepad(start) {
+    // edge-фильтр: запоминаем какие кнопки нажаты при заходе в меню, чтобы
+    // зажатая ранее кнопка (например, при рестарте) не дёргала старт сразу.
+    const initial = sampleButtons();
     const tick = () => {
       if (!this.scene.isActive()) return;
-      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      for (const p of pads) {
-        if (!p) continue;
-        if (p.buttons.some(b => b && b.pressed)) {
-          start();
-          return;
-        }
+      const now = sampleButtons();
+      if (now.some((v, i) => v && !initial[i])) {
+        start();
+        return;
       }
       this.time.delayedCall(50, tick);
     };
     tick();
   }
+}
+
+function sampleButtons() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const out = [];
+  for (const p of pads) {
+    if (!p) continue;
+    for (let i = 0; i < p.buttons.length; i++) out[i] = !!(p.buttons[i] && p.buttons[i].pressed);
+    return out;
+  }
+  return out;
 }

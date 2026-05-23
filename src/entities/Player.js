@@ -1,7 +1,7 @@
 import {
   PLAYER_SPEED, PLAYER_SIZE, PLAYER_MAX_HP, FIRE_RATE_MS, STARTING_AMMO,
   STAMINA_MAX, STAMINA_SPRINT_PER_SEC, STAMINA_REGEN_PER_SEC,
-  SPRINT_MULTIPLIER, DASH_DISTANCE, DASH_DURATION_MS, DASH_COOLDOWN_MS,
+  SPRINT_MULTIPLIER, DASH_DISTANCE, DASH_DURATION_MS, DASH_COOLDOWN_MS, DASH_STAMINA_COST,
   ARMOR_MAX, ARMOR_REGEN_DELAY_MS, SLOW_MULTIPLIER,
 } from '../config/constants.js';
 import { applyKnockback, KNOCKBACK_DURATION, INVULNERABILITY_DURATION } from '../systems/Combat.js';
@@ -88,29 +88,24 @@ export class Player {
     const now = this.scene.time.now;
     if (now < this.knockbackUntil) return; // knockback ведёт игрока
 
-    // dash в процессе → принудительная скорость, неуязвимость, обрыв при ударе о стену
+    // dash в процессе → принудительная скорость, неуязвимость.
+    // Phaser arcade сам тормозит при коллизии со стеной — отдельный abort
+    // не нужен, иначе игрок ощущает «трение» (резкая остановка вдоль стены).
     if (now < this.dashUntil) {
       const speed = DASH_DISTANCE / (DASH_DURATION_MS / 1000);
       this.sprite.body.setVelocity(this.dashDir.x * speed, this.dashDir.y * speed);
-      const b = this.sprite.body.blocked;
-      const hitWall =
-        (this.dashDir.x > 0 && b.right) || (this.dashDir.x < 0 && b.left) ||
-        (this.dashDir.y > 0 && b.down)  || (this.dashDir.y < 0 && b.up);
-      if (hitWall) {
-        this.dashUntil = now;
-        this.sprite.body.setVelocity(0, 0);
-      }
       return;
     }
 
-    // активация dash
-    if (input.dash && now >= this.dashCooldownUntil) {
+    // активация dash — требует и cooldown'а, и хватает stamina
+    if (input.dash && now >= this.dashCooldownUntil && this.stamina >= DASH_STAMINA_COST) {
       const dir = (input.move.x || input.move.y)
         ? { x: input.move.x, y: input.move.y }
         : (this.aim || { x: 1, y: 0 });
       this.dashDir = dir;
       this.dashUntil = now + DASH_DURATION_MS;
       this.dashCooldownUntil = now + DASH_COOLDOWN_MS;
+      this.stamina = Math.max(0, this.stamina - DASH_STAMINA_COST);
       this.iframesUntil = Math.max(this.iframesUntil, this.dashUntil);
       getSound().dash();
       return;
