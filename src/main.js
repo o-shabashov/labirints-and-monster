@@ -9,14 +9,19 @@ import { GAME_W, CANVAS_H } from './config/constants.js';
 const config = {
   type: Phaser.AUTO,
   backgroundColor: '#111418',
-  pixelArt: true,
-  // Phaser SoundManager сам обработает user-gesture unlock при первом нажатии.
-  // FIT — растягивает canvas пропорционально под окно, без потери aspect.
+  // pixelArt: true заодно сглаживание для текста/UI ломал и при FIT-зуме всё
+  // становилось «лесенкой». Включаем normal antialiasing на уровне canvas,
+  // а для pixel-art-текстур применяем NEAREST per-texture в BootScene.
+  antialias: true,
+  roundPixels: false,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: GAME_W,
     height: CANVAS_H,
+    // на retina backing store больше — текст и края градиента не размываются
+    // при последующем CSS-fit'е.
+    zoom: window.devicePixelRatio || 1,
   },
   physics: {
     default: 'arcade',

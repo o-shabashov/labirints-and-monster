@@ -67,6 +67,14 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    // Pixel-art ассеты должны рендериться NEAREST, чтобы спрайты оставались
+    // чёткими при scale. Текст и canvas-level scaling остаются bilinear
+    // (antialias=true в Phaser config) — UI и края градиента сглажены.
+    for (const [key] of SPRITES) {
+      const tex = this.textures.get(key);
+      if (tex && tex.setFilter) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+
     // Радиальный кольцевой brush для FogOfWar и (опционально) softCircle
     // accumulator для memory. Прозрачный в центре, peak alpha у границы,
     // снова прозрачный за пределами — сглаживает блочную границу зрения.

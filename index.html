@@ -9,7 +9,10 @@
   <style>
     html, body { margin: 0; padding: 0; background: #0a0d10; height: 100%; }
     body { display: flex; align-items: center; justify-content: center; }
-    canvas { image-rendering: pixelated; }
+    /* image-rendering убран — это вело к лесенке при FIT-зуме. Браузер */
+    /* теперь сглаживает CSS-scale естественным bilinear'ом, а спрайт-      */
+    /* текстуры отдельно остаются NEAREST через Phaser FilterMode.          */
+    canvas { image-rendering: auto; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 </head>
