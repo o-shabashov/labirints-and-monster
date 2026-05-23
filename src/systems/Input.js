@@ -68,13 +68,13 @@ export class Input {
       if (aim.x !== 0 || aim.y !== 0) {
         const m = Math.hypot(aim.x, aim.y);
         gpAim = { x: aim.x / m, y: aim.y / m };
-        gpShoot = true; // авто-fire при отклонённом правом стике
       }
-      // standard mapping: 0=A, 2=X, 6=LT (axes-like trigger 0..1), 9=Start
+      // standard mapping: 0=A, 2=X, 6=LT, 7=RT, 9=Start (триггеры — axes-like value 0..1)
       gpDash = !!(gp.buttons[0] && gp.buttons[0].pressed);
       gpInteract = !!(gp.buttons[2] && gp.buttons[2].pressed);
       gpPause = !!(gp.buttons[9] && gp.buttons[9].pressed);
       gpSprint = !!(gp.buttons[6] && gp.buttons[6].value > 0.2);
+      gpShoot = !!(gp.buttons[7] && gp.buttons[7].value > 0.2);
 
       // активность гейпада: ненулевые стики или нажатая кнопка
       const anyBtn = gp.buttons.some(b => b && b.pressed);

@@ -85,10 +85,18 @@ export class Player {
     const now = this.scene.time.now;
     if (now < this.knockbackUntil) return; // knockback ведёт игрока
 
-    // dash в процессе → принудительная скорость, неуязвимость
+    // dash в процессе → принудительная скорость, неуязвимость, обрыв при ударе о стену
     if (now < this.dashUntil) {
       const speed = DASH_DISTANCE / (DASH_DURATION_MS / 1000);
       this.sprite.body.setVelocity(this.dashDir.x * speed, this.dashDir.y * speed);
+      const b = this.sprite.body.blocked;
+      const hitWall =
+        (this.dashDir.x > 0 && b.right) || (this.dashDir.x < 0 && b.left) ||
+        (this.dashDir.y > 0 && b.down)  || (this.dashDir.y < 0 && b.up);
+      if (hitWall) {
+        this.dashUntil = now;
+        this.sprite.body.setVelocity(0, 0);
+      }
       return;
     }
 

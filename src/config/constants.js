@@ -51,9 +51,12 @@ export const STAMINA_MAX = 100;
 export const STAMINA_SPRINT_PER_SEC = 40;
 export const STAMINA_REGEN_PER_SEC = 25;
 export const SPRINT_MULTIPLIER = 1.6;
-export const DASH_DISTANCE = 200;     // px
-export const DASH_DURATION_MS = 120;
+export const DASH_DISTANCE = 96;      // px (3 тайла)
+export const DASH_DURATION_MS = 180;
 export const DASH_COOLDOWN_MS = 1500;
+
+export const AIM_CONE_LENGTH = 100;            // px
+export const AIM_CONE_HALF_ANGLE = Math.PI / 7; // ≈25.7°
 
 export const WANDERER_VISION_TILES = 4;
 export const WANDERER_LOSE_INTEREST_MS = 3000;

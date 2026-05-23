@@ -3,6 +3,7 @@ import {
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
   COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES, AMMO_PACK,
+  AIM_CONE_LENGTH, AIM_CONE_HALF_ANGLE,
 } from '../config/constants.js';
 import { TileMap } from '../world/TileMap.js';
 import { Player } from '../entities/Player.js';
@@ -123,6 +124,9 @@ export class GameScene extends Phaser.Scene {
     // компас — стрелка-точка на краю круга видимости
     this.compassArrow = this.add.graphics().setDepth(12);
 
+    // конус прицела — полупрозрачный треугольник в направлении aim
+    this.aimCone = this.add.graphics().setDepth(6);
+
     // двери (по тайлам в map) и ключи (по keySpec)
     this.doors = [];
     for (const d of this.map.findDoors()) {
@@ -237,6 +241,22 @@ export class GameScene extends Phaser.Scene {
       const py = this.player.sprite.y + (dy / len) * r;
       this.compassArrow.fillStyle(0xffd54f, 1);
       this.compassArrow.fillCircle(px, py, 5);
+    }
+
+    // конус прицела
+    this.aimCone.clear();
+    const aimDir = input.aim || this.lastMoveDir;
+    if (aimDir && (aimDir.x !== 0 || aimDir.y !== 0)) {
+      const px = this.player.sprite.x;
+      const py = this.player.sprite.y;
+      const angle = Math.atan2(aimDir.y, aimDir.x);
+      const len = AIM_CONE_LENGTH;
+      const ax = px + Math.cos(angle - AIM_CONE_HALF_ANGLE) * len;
+      const ay = py + Math.sin(angle - AIM_CONE_HALF_ANGLE) * len;
+      const bx = px + Math.cos(angle + AIM_CONE_HALF_ANGLE) * len;
+      const by = py + Math.sin(angle + AIM_CONE_HALF_ANGLE) * len;
+      this.aimCone.fillStyle(0xfff176, 0.18);
+      this.aimCone.fillTriangle(px, py, ax, ay, bx, by);
     }
 
     this.fog.update(this.player.sprite.x, this.player.sprite.y);
