@@ -2,6 +2,7 @@ import { TILE, TILE_SIZE, GRID_W, GRID_H } from '../config/constants.js';
 import { TileMap } from '../world/TileMap.js';
 import { Player } from '../entities/Player.js';
 import { generateMaze } from '../world/MazeGenerator.js';
+import { FogOfWar } from '../world/FogOfWar.js';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -24,6 +25,9 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT');
+
+    this.fog = new FogOfWar(this, GRID_W, GRID_H);
+    this.player.sprite.setDepth(5);  // под маской, но над полом
   }
 
   update() {
@@ -38,5 +42,6 @@ export class GameScene extends Phaser.Scene {
     if (len > 0) { move.x /= len; move.y /= len; }
 
     this.player.update({ move });
+    this.fog.update(this.player.sprite.x, this.player.sprite.y);
   }
 }
