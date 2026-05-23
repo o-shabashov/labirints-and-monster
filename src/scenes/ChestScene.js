@@ -51,32 +51,33 @@ export class ChestScene extends Phaser.Scene {
       c.bg.on('pointerover', () => { this.selected = c.idx; this.refreshHighlight(); });
       c.bg.on('pointerdown', () => this.choose(c.idx));
     }
-    // геймпад: стик Y или dpad — навигация; A / B / X — выбор соответствующего варианта;
-    // RT/L2 — подтвердить текущий.
-    this._gpInitial = sampleButtons();
+    // геймпад опрашивается в update() — delayedCall в overlay-сцене не тикает
+    // когда родительская GameScene запаузена.
+    this._gpPrev = sampleButtons();
     this._gpAxisCooldown = 0;
-    this.gpTick = () => {
-      if (!this.scene.isActive()) return;
-      const pad = navigator.getGamepads ? Array.from(navigator.getGamepads()).find(p => p) : null;
-      if (pad) {
-        const cur = pad.buttons.map(b => !!(b && b.pressed));
-        const fresh = (i) => cur[i] && !this._gpInitial[i];
-        if (fresh(0)) { this.choose(this.selected); return; }
-        if (fresh(1) && this.options[1]) { this.choose(1); return; }
-        if (fresh(2) && this.options[2]) { this.choose(2); return; }
-        // стик/dpad по Y
-        const axisY = pad.axes[1] || 0;
-        const dpadUp = cur[12], dpadDown = cur[13];
-        const now = performance.now();
-        if (now > this._gpAxisCooldown) {
-          if (axisY < -0.4 || dpadUp) { this.move(-1); this._gpAxisCooldown = now + 250; }
-          else if (axisY > 0.4 || dpadDown) { this.move(+1); this._gpAxisCooldown = now + 250; }
-        }
-        this._gpInitial = cur;
+  }
+
+  update() {
+    const pad = navigator.getGamepads ? Array.from(navigator.getGamepads()).find(p => p) : null;
+    if (!pad) return;
+    const cur = pad.buttons.map(b => !!(b && b.pressed));
+    const fresh = (i) => cur[i] && !this._gpPrev[i];
+    if (fresh(0)) { this._gpPrev = cur; this.choose(this.selected); return; }
+    if (fresh(1) && this.options[1]) { this._gpPrev = cur; this.choose(1); return; }
+    if (fresh(2) && this.options[2]) { this._gpPrev = cur; this.choose(2); return; }
+    const axisY = pad.axes[1] || 0;
+    const dpadUp = cur[12], dpadDown = cur[13];
+    const now = performance.now();
+    if (now > this._gpAxisCooldown) {
+      if (axisY < -0.4 || dpadUp) {
+        this.move(-1);
+        this._gpAxisCooldown = now + 220;
+      } else if (axisY > 0.4 || dpadDown) {
+        this.move(+1);
+        this._gpAxisCooldown = now + 220;
       }
-      this.time.delayedCall(50, this.gpTick);
-    };
-    this.gpTick();
+    }
+    this._gpPrev = cur;
   }
 
   drawCard(idx, type, y) {
