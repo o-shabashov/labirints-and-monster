@@ -1,13 +1,51 @@
-import { GAME_W, GAME_H, COLOR } from '../config/constants.js';
+import { TILE, TILE_SIZE, GRID_W, GRID_H } from '../config/constants.js';
+import { TileMap } from '../world/TileMap.js';
+import { Player } from '../entities/Player.js';
+
+function makeFixedMaze() {
+  // простая рамка + несколько перегородок
+  const t = [];
+  for (let y = 0; y < GRID_H; y++) {
+    const row = [];
+    for (let x = 0; x < GRID_W; x++) {
+      const isBorder = x === 0 || y === 0 || x === GRID_W - 1 || y === GRID_H - 1;
+      row.push(isBorder ? TILE.WALL : TILE.FLOOR);
+    }
+    t.push(row);
+  }
+  // две вертикальные перегородки с проёмами
+  for (let y = 1; y < GRID_H - 1; y++) {
+    if (y !== 5) t[y][10] = TILE.WALL;
+    if (y !== 15) t[y][20] = TILE.WALL;
+  }
+  return t;
+}
 
 export class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
   }
+
   create() {
-    this.cameras.main.setBackgroundColor(COLOR.BG);
-    this.add.text(GAME_W / 2, GAME_H / 2, 'GameScene', {
-      fontFamily: 'monospace', fontSize: '24px', color: '#4ec9ff',
-    }).setOrigin(0.5);
+    this.map = new TileMap(this, makeFixedMaze());
+    const spawn = this.map.tileToWorld(2, 2);
+    this.player = new Player(this, spawn.x, spawn.y);
+    this.physics.add.collider(this.player.sprite, this.map.walls);
+
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT');
+  }
+
+  update() {
+    // временный inline-ввод, заменим в Task 5
+    const k = this.keys;
+    const move = { x: 0, y: 0 };
+    if (k.A.isDown || k.LEFT.isDown) move.x = -1;
+    else if (k.D.isDown || k.RIGHT.isDown) move.x = 1;
+    if (k.W.isDown || k.UP.isDown) move.y = -1;
+    else if (k.S.isDown || k.DOWN.isDown) move.y = 1;
+    const len = Math.hypot(move.x, move.y);
+    if (len > 0) { move.x /= len; move.y /= len; }
+
+    this.player.update({ move });
   }
 }

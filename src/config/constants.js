@@ -31,3 +31,5 @@ export const TILE = {
 };
 
 export const PLAYER_SPEED = 160;   // px/sec
+
+export const PLAYER_SIZE = 20;  // меньше тайла, чтобы пролезать в коридоры
