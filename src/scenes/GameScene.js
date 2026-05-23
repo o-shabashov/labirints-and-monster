@@ -38,7 +38,7 @@ export class GameScene extends Phaser.Scene {
     this.lastAimDir = { x: 1, y: 0 };
 
     const seed = Date.now();
-    const { grid, keys: keySpec } = generateMaze(GRID_W, GRID_H, seed);
+    const { grid, keys: keySpec, doors: doorSpec } = generateMaze(GRID_W, GRID_H, seed);
     this.map = new TileMap(this, grid);
 
     this.stats = {
@@ -138,17 +138,20 @@ export class GameScene extends Phaser.Scene {
     // индикатор направления игрока — белая точка на «макушке» спрайта
     this.playerDir = this.add.graphics().setDepth(6);
 
-    // двери (по тайлам в map) и ключи (по keySpec)
+    // двери — каждая логическая дверь занимает несколько тайлов проёма
     this.doors = [];
-    for (const d of this.map.findDoors()) {
-      const door = new Door(this, d.x, d.y, d.tile, this.map);
-      this.physics.add.collider(this.player.sprite, door.sprite, () => {
+    for (const spec of (doorSpec || [])) {
+      const door = new Door(this, spec.color, spec.cells, this.map);
+      const onTouch = () => {
         if (this.player.hasKey(door.color)) {
           door.open();
           this.sound.door();
           this.doors = this.doors.filter(x => x !== door);
         }
-      });
+      };
+      for (const s of door.sprites) {
+        this.physics.add.collider(this.player.sprite, s, onTouch);
+      }
       this.doors.push(door);
     }
 

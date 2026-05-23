@@ -7,10 +7,15 @@ export class UIScene extends Phaser.Scene {
   constructor() { super('UIScene'); }
   create() {
     // топ-бар не зависит от мира и виден поверх него:
-    // ставим собственный viewport во всю ширину и высоту TOPBAR_H, без скролла.
     this.cameras.main.setViewport(0, 0, GAME_W, TOPBAR_H);
-    this.bg = this.add.rectangle(0, 0, GAME_W, TOPBAR_H, 0x0a0d10).setOrigin(0, 0);
-    this.add.line(0, TOPBAR_H - 1, 0, 0, GAME_W, 0, 0x3a4250).setOrigin(0, 0);
+    // фон топбара — тайлы стены из 0x72, чтобы UI выглядел как каменный
+    // верх над dungeon, а не пустой прямоугольник. tileSprite повторяет 16×16
+    // wall по всему верху, поверх — лёгкое затемнение для читабельности текста.
+    this.bg = this.add.tileSprite(0, 0, GAME_W, TOPBAR_H, 'wall').setOrigin(0, 0);
+    this.bg.tileScaleX = 2; this.bg.tileScaleY = 2;
+    this.bgOverlay = this.add.rectangle(0, 0, GAME_W, TOPBAR_H, 0x000000, 0.55).setOrigin(0, 0);
+    // нижняя кромка — линия пола, разделяет HUD и игровой мир
+    this.add.line(0, TOPBAR_H - 2, 0, 0, GAME_W, 0, 0x6a5040).setOrigin(0, 0).setLineWidth(2);
 
     // ряд 1 (y=6)
     this.hpText = this.add.text(12, 6, '', {

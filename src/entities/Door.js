@@ -1,33 +1,31 @@
 import { TILE_SIZE, TILE } from '../config/constants.js';
 
-const TILE_TO_COLOR = {
-  [TILE.DOOR_R]: 'r',
-  [TILE.DOOR_G]: 'g',
-  [TILE.DOOR_B]: 'b',
-};
-
-// hex-цвет tint'а для соответствующего цвета двери — visual подсказка игроку.
 const TINT = { r: 0xff5252, g: 0x66bb6a, b: 0x42a5f5 };
 
+// Одна логическая «дверь» теперь занимает несколько тайлов (после widening
+// проёмы 2-клеточные). Все спрайты двери привязаны к одной сущности — открыл
+// один — открылись все.
 export class Door {
-  constructor(scene, tx, ty, tile, map) {
+  constructor(scene, color, cells, map) {
     this.scene = scene;
-    this.tx = tx;
-    this.ty = ty;
-    this.tile = tile;
-    this.color = TILE_TO_COLOR[tile];
+    this.color = color;
+    this.cells = cells;
     this.map = map;
-    const wx = tx * TILE_SIZE + TILE_SIZE / 2;
-    const wy = ty * TILE_SIZE + TILE_SIZE / 2;
-    this.sprite = scene.physics.add.staticImage(wx, wy, 'door_base');
-    this.sprite.setScale(2);
-    this.sprite.setTint(TINT[this.color]);
-    this.sprite.refreshBody();
-    this.sprite.doorRef = this;
+    this.sprites = cells.map(c => {
+      const wx = c.x * TILE_SIZE + TILE_SIZE / 2;
+      const wy = c.y * TILE_SIZE + TILE_SIZE / 2;
+      const s = scene.physics.add.staticImage(wx, wy, 'door_base');
+      s.setScale(2);
+      s.setTint(TINT[color]);
+      s.refreshBody();
+      s.doorRef = this;
+      return s;
+    });
   }
 
   open() {
-    this.map.tiles[this.ty][this.tx] = TILE.FLOOR;
-    this.sprite.destroy();
+    for (const c of this.cells) this.map.tiles[c.y][c.x] = TILE.FLOOR;
+    for (const s of this.sprites) s.destroy();
+    this.sprites = [];
   }
 }

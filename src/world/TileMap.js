@@ -34,22 +34,36 @@ export class TileMap {
         }
       }
     }
-    // Физика — мерджим стены в горизонтальные runs, чтобы вместо сетки из
-    // тысячи маленьких AABB получить десятки длинных. Игрок больше не цепляется
-    // за «уголки» между двумя смежными wall-тайлами.
+    // Физика — greedy 2D rectangle merge. Для каждой непокрытой wall-клетки
+    // расширяем максимальный прямоугольник из walls (вправо до упора, потом
+    // вниз пока вся полоска ещё wall). Это убирает швы и по горизонтали, и
+    // по вертикали — игрок больше не цепляется за внутренние углы соседних
+    // тайлов.
+    const covered = Array.from({ length: this.height }, () => new Array(this.width).fill(false));
     for (let y = 0; y < this.height; y++) {
-      let x = 0;
-      while (x < this.width) {
-        if (this.tiles[y][x] !== TILE.WALL) { x++; continue; }
-        let endX = x;
-        while (endX + 1 < this.width && this.tiles[y][endX + 1] === TILE.WALL) endX++;
-        const len = endX - x + 1;
-        const cx = x * TILE_SIZE + (len * TILE_SIZE) / 2;
-        const cy = y * TILE_SIZE + TILE_SIZE / 2;
-        const zone = this.scene.add.zone(cx, cy, len * TILE_SIZE, TILE_SIZE);
+      for (let x = 0; x < this.width; x++) {
+        if (this.tiles[y][x] !== TILE.WALL || covered[y][x]) continue;
+        let mw = 1;
+        while (x + mw < this.width
+            && this.tiles[y][x + mw] === TILE.WALL
+            && !covered[y][x + mw]) mw++;
+        let mh = 1;
+        outer: while (y + mh < this.height) {
+          for (let dx = 0; dx < mw; dx++) {
+            if (this.tiles[y + mh][x + dx] !== TILE.WALL || covered[y + mh][x + dx]) {
+              break outer;
+            }
+          }
+          mh++;
+        }
+        for (let dy = 0; dy < mh; dy++) {
+          for (let dx = 0; dx < mw; dx++) covered[y + dy][x + dx] = true;
+        }
+        const cx = x * TILE_SIZE + (mw * TILE_SIZE) / 2;
+        const cy = y * TILE_SIZE + (mh * TILE_SIZE) / 2;
+        const zone = this.scene.add.zone(cx, cy, mw * TILE_SIZE, mh * TILE_SIZE);
         this.scene.physics.add.existing(zone, true);
         this.walls.add(zone);
-        x = endX + 1;
       }
     }
   }
