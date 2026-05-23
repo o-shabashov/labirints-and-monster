@@ -155,14 +155,115 @@ function findReachableExcluding(grid, sx, sy, blockX, blockY) {
 }
 
 // Публичная точка входа: 50/50 случайно выбирает алгоритм.
+// Публичная точка входа: по умолчанию hybrid (корридор-лабиринт + 3–5 комнат
+// внутри). 'corridor' и 'rooms' доступны как чистые варианты.
 export function generateMaze(width, height, seed = Date.now(), style = null) {
-  if (!style) {
-    // детерминированный pick по seed чтобы тесты с фиксированным seed были стабильны
-    const r = mulberry(seed ^ 0x123)();
-    style = r < 0.5 ? 'rooms' : 'corridor';
-  }
+  if (!style) style = 'hybrid';
   if (style === 'rooms') return generateRoomDungeon(width, height, seed);
-  return generateCorridorMaze(width, height, seed);
+  if (style === 'corridor') return generateCorridorMaze(width, height, seed);
+  return generateHybridDungeon(width, height, seed);
+}
+
+// Hybrid: сначала прокладываем corridor-maze step=3 (узкие проходы +
+// расширения), затем вкрапливаем 3–5 случайных открытых комнат поверх стен.
+// Комнаты автоматически связываются с maze, потому что carve gridit FLOOR
+// поверх уже выстроенной сетки.
+function generateHybridDungeon(width, height, seed) {
+  if (width % 2 === 0) width++;
+  if (height % 2 === 0) height++;
+  const grid = Array.from({ length: height }, () => new Array(width).fill(TILE.WALL));
+  const passages = carve(grid, width, height, seed);
+  addRandomRooms(grid, width, height, seed ^ 0xC0FFEE);
+  return placeEntranceExitDoors(grid, width, height, passages, seed);
+}
+
+function addRandomRooms(grid, width, height, seed) {
+  const rand = mulberry(seed);
+  const rooms = [];
+  const target = 3 + Math.floor(rand() * 3);  // 3..5 комнат
+  for (let tries = 0; tries < 40 && rooms.length < target; tries++) {
+    const rw = 4 + Math.floor(rand() * 3);    // 4..6
+    const rh = 4 + Math.floor(rand() * 3);
+    if (width - rw - 4 < 1 || height - rh - 4 < 1) continue;
+    const rx = 2 + Math.floor(rand() * (width - rw - 4));
+    const ry = 2 + Math.floor(rand() * (height - rh - 4));
+    // отступ 2 между комнатами, иначе rooms сливаются в одну гигантскую кашу
+    const overlaps = rooms.some(r =>
+      rx < r.x + r.w + 2 && rx + rw + 2 > r.x &&
+      ry < r.y + r.h + 2 && ry + rh + 2 > r.y
+    );
+    if (overlaps) continue;
+    for (let y = ry; y < ry + rh; y++) {
+      for (let x = rx; x < rx + rw; x++) {
+        if (x > 0 && x < width - 1 && y > 0 && y < height - 1) grid[y][x] = TILE.FLOOR;
+      }
+    }
+    rooms.push({ x: rx, y: ry, w: rw, h: rh });
+  }
+  return rooms;
+}
+
+// общий пост-процесс: entrance/exit + двери/ключи на bottleneck-клетках пути.
+function placeEntranceExitDoors(grid, width, height, passages, seed) {
+  const sx = 1, sy = 1;
+  // если стартовая клетка попала под комнату, ENTRANCE всё равно ставим — она floor.
+  grid[sy][sx] = TILE.ENTRANCE;
+  const dist = bfsDistances(grid, sx, sy);
+  let bestX = sx, bestY = sy, bestD = 0;
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    if (dist[y][x] > bestD) { bestD = dist[y][x]; bestX = x; bestY = y; }
+  }
+  grid[bestY][bestX] = TILE.EXIT;
+
+  // двери — только на passages, которые остались узкими (не съедены комнатой)
+  const path = findPath(grid, sx, sy, bestX, bestY);
+  const onPath = new Set(path.map(p => p.y * width + p.x));
+  const narrowPassages = (passages || []).filter(p =>
+    p.cells.every(c => {
+      // оба соседних cell по перпендикулярной оси должны оставаться WALL —
+      // иначе это уже не bottleneck, а вход в комнату.
+      const horizontalGap = grid[c.y][c.x - 1] === TILE.WALL && grid[c.y][c.x + 1] === TILE.WALL;
+      const verticalGap   = grid[c.y - 1] && grid[c.y - 1][c.x] === TILE.WALL && grid[c.y + 1] && grid[c.y + 1][c.x] === TILE.WALL;
+      return horizontalGap || verticalGap;
+    }) && p.cells.some(c => onPath.has(c.y * width + c.x))
+  );
+
+  const doorColors = [TILE.DOOR_R, TILE.DOOR_G, TILE.DOOR_B];
+  const keyColors = ['r', 'g', 'b'];
+  const keys = [], doors = [];
+  const rand = mulberry(seed ^ 0xABCDEF);
+  const doorsToPlace = narrowPassages.length > 0
+    ? Math.min(narrowPassages.length, 1 + Math.floor(rand() * 3))
+    : 0;
+  const used = new Set();
+  for (let i = 0; i < doorsToPlace; i++) {
+    let pick;
+    for (let t = 0; t < 30; t++) {
+      pick = narrowPassages[Math.floor(rand() * narrowPassages.length)];
+      const key = pick.cells[0].y * width + pick.cells[0].x;
+      if (!used.has(key)) { used.add(key); break; }
+    }
+    const tile = doorColors[i];
+    // bounds — carve мог сохранить в passages cell за пределами области
+    // (y+1 == height-1 на нижней строке), эти клетки скипаем.
+    const inside = pick.cells.filter(c =>
+      c.x > 0 && c.x < width - 1 && c.y > 0 && c.y < height - 1
+    );
+    if (inside.length === 0) { i--; continue; }
+    for (const c of inside) grid[c.y][c.x] = tile;
+    doors.push({ color: keyColors[i], cells: inside });
+    const blocked = new Set(inside.map(c => c.y * width + c.x));
+    const safe = findReachableExcludingMulti(grid, sx, sy, blocked);
+    const far = safe.filter(c =>
+      Math.hypot(c.x - pick.cells[0].x, c.y - pick.cells[0].y) >= 5
+    );
+    const pool = far.length ? far : safe;
+    if (pool.length) {
+      const cell = pool[Math.floor(rand() * pool.length)];
+      keys.push({ color: keyColors[i], x: cell.x, y: cell.y });
+    }
+  }
+  return { grid, keys, doors };
 }
 
 function mulberry(seed) {
