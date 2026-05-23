@@ -45,7 +45,8 @@ export const IFRAMES_MS = 400;
 
 export const BULLET_SPEED = 500;
 export const BULLET_LIFETIME_MS = 800;
-export const FIRE_RATE_MS = 300;
+export const FIRE_RATE_MS = 500;       // базовая скорострельность — заметно медленнее
+export const FIRE_RATE_PER_LEVEL = 0.15; // каждый уровень оружия −15% к интервалу
 export const STARTING_AMMO = 32;
 export const MONSTER_HP_DEFAULT = 1;
 

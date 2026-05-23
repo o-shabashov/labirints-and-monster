@@ -3,6 +3,7 @@ import { getSound } from '../systems/Sound.js';
 
 export class MenuScene extends Phaser.Scene {
   constructor() { super('MenuScene'); }
+
   create() {
     this.cameras.main.setBackgroundColor(0x0a0d10);
     this.add.text(GAME_W / 2, 120, 'Labirints & Monster', {
@@ -19,43 +20,39 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '18px', color: '#ffd54f',
     }).setOrigin(0.5);
 
-    // WebAudio требует user-gesture перед стартом — оба входа служат активатором.
-    let started = false;
-    const start = () => {
-      if (started) return;
-      started = true;
+    this._started = false;
+    this._start = () => {
+      if (this._started) return;
+      this._started = true;
       const sound = getSound();
       sound.resume();
       sound.startMusic();
       this.scene.start('GameScene');
     };
-    this.input.keyboard.once('keydown-SPACE', start);
-    this.pollGamepad(start);
+    this.input.keyboard.once('keydown-SPACE', this._start);
+    // initial state — чтобы зажатая ранее кнопка (например, после рестарта)
+    // не дёргала старт мгновенно при следующем заходе.
+    this._gpInitial = sampleButtons();
   }
-  pollGamepad(start) {
-    // edge-фильтр: запоминаем какие кнопки нажаты при заходе в меню, чтобы
-    // зажатая ранее кнопка (например, при рестарте) не дёргала старт сразу.
-    const initial = sampleButtons();
-    const tick = () => {
-      if (!this.scene.isActive()) return;
-      const now = sampleButtons();
-      if (now.some((v, i) => v && !initial[i])) {
-        start();
-        return;
-      }
-      this.time.delayedCall(50, tick);
-    };
-    tick();
+
+  // Polling в update() надёжнее, чем delayedCall — он точно тикает пока
+  // scene активна, не зависит от внутренних таймеров.
+  update() {
+    if (this._started) return;
+    const cur = sampleButtons();
+    if (cur.some((v, i) => v && !this._gpInitial[i])) {
+      this._start();
+      return;
+    }
+    this._gpInitial = cur;
   }
 }
 
 function sampleButtons() {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const out = [];
   for (const p of pads) {
     if (!p) continue;
-    for (let i = 0; i < p.buttons.length; i++) out[i] = !!(p.buttons[i] && p.buttons[i].pressed);
-    return out;
+    return p.buttons.map(b => !!(b && b.pressed));
   }
-  return out;
+  return [];
 }

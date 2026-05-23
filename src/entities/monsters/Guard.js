@@ -17,6 +17,7 @@ export class Guard extends Monster {
   }
 
   update(dtMs, player, map) {
+    if (this.isStunned()) return;
     this.repathTimer -= dtMs;
     const mt = this.tilePos();
     const pt = this.getTargetTile(player);

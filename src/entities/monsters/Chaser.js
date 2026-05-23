@@ -12,6 +12,7 @@ export class Chaser extends Monster {
   }
 
   update(dtMs, player, map) {
+    if (this.isStunned()) return;  // knockback продолжает физикой
     this.repathTimer -= dtMs;
     if (this.repathTimer <= 0 || !this.target) {
       this.repathTimer = REPATH_MS;

@@ -2,6 +2,7 @@ import { GAME_W, GAME_H } from '../config/constants.js';
 
 export class GameOverScene extends Phaser.Scene {
   constructor() { super('GameOverScene'); }
+
   create(data = {}) {
     const summary = data || {};
     this.cameras.main.setBackgroundColor(0x201010);
@@ -19,36 +20,37 @@ export class GameOverScene extends Phaser.Scene {
     this.add.text(GAME_W / 2, GAME_H / 2 + 90, 'ПРОБЕЛ / любая кнопка геймпада — заново', {
       fontFamily: 'monospace', fontSize: '16px', color: '#888888',
     }).setOrigin(0.5);
-    const restart = () => this.scene.start('GameScene');
-    this.input.keyboard.once('keydown-SPACE', restart);
-    pollGamepadOnce(this, restart);
+    this._restart = () => this.scene.start('GameScene');
+    this.input.keyboard.once('keydown-SPACE', this._restart);
+    this._gpInitial = sampleButtons();
+    this._done = false;
+  }
+
+  update() {
+    if (this._done) return;
+    const cur = sampleButtons();
+    if (cur.some((v, i) => v && !this._gpInitial[i])) {
+      this._done = true;
+      this._restart();
+      return;
+    }
+    this._gpInitial = cur;
   }
 }
 
 // общий поллер для конечных сцен — слушает любую кнопку до момента нажатия.
+// Оставлен экспортом для VictoryScene, которая делегирует сюда.
 export function pollGamepadOnce(scene, onPress) {
-  // снимаем «отпечаток» начального состояния, чтобы переход не сработал от
-  // ещё зажатой кнопки, которая привела к смерти.
-  const initial = sampleButtons();
-  const tick = () => {
-    if (!scene.scene.isActive()) return;
-    const now = sampleButtons();
-    if (now.some((v, i) => v && !initial[i])) {
-      onPress();
-      return;
-    }
-    scene.time.delayedCall(50, tick);
-  };
-  tick();
+  scene._gpInitial = sampleButtons();
+  scene._restart = onPress;
+  scene._done = false;
 }
 
 function sampleButtons() {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const out = [];
   for (const p of pads) {
     if (!p) continue;
-    for (let i = 0; i < p.buttons.length; i++) out[i] = !!(p.buttons[i] && p.buttons[i].pressed);
-    return out;
+    return p.buttons.map(b => !!(b && b.pressed));
   }
-  return out;
+  return [];
 }

@@ -1,7 +1,7 @@
 // Список возможных бафов и дебафов. Дебафы применяются сразу,
 // бафы — через ChestScene с предложением 3 вариантов.
 export const POWER_UPS = [
-  'armor', 'heal', 'ammo', 'compass', 'lure',
+  'armor', 'heal', 'compass', 'lure',
   'speed', 'damage', 'rapid_fire', 'vision_boost', 'regen',
   'shield', 'weapon_upgrade',
 ];

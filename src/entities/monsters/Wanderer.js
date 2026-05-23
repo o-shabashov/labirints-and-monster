@@ -47,6 +47,7 @@ export class Wanderer extends Monster {
   }
 
   update(dtMs, player, map) {
+    if (this.isStunned()) return;
     const now = this.scene.time.now;
     if (this.canSee(player, map)) {
       this.mode = 'chase';

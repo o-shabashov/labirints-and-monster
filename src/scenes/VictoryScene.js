@@ -1,10 +1,7 @@
 import { GAME_W, GAME_H } from '../config/constants.js';
-import { pollGamepadOnce } from './GameOverScene.js';
 
 export class VictoryScene extends Phaser.Scene {
-  constructor() {
-    super('VictoryScene');
-  }
+  constructor() { super('VictoryScene'); }
 
   create(data = {}) {
     const summary = data || {};
@@ -23,8 +20,29 @@ export class VictoryScene extends Phaser.Scene {
     this.add.text(GAME_W / 2, GAME_H / 2 + 90, 'ПРОБЕЛ / любая кнопка геймпада — заново', {
       fontFamily: 'monospace', fontSize: '16px', color: '#888888',
     }).setOrigin(0.5);
-    const restart = () => this.scene.start('GameScene');
-    this.input.keyboard.once('keydown-SPACE', restart);
-    pollGamepadOnce(this, restart);
+    this._restart = () => this.scene.start('GameScene');
+    this.input.keyboard.once('keydown-SPACE', this._restart);
+    this._gpInitial = sampleButtons();
+    this._done = false;
   }
+
+  update() {
+    if (this._done) return;
+    const cur = sampleButtons();
+    if (cur.some((v, i) => v && !this._gpInitial[i])) {
+      this._done = true;
+      this._restart();
+      return;
+    }
+    this._gpInitial = cur;
+  }
+}
+
+function sampleButtons() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const p of pads) {
+    if (!p) continue;
+    return p.buttons.map(b => !!(b && b.pressed));
+  }
+  return [];
 }

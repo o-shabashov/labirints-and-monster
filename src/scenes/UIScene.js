@@ -1,5 +1,5 @@
 import {
-  PLAYER_MAX_HP, STARTING_AMMO, STAMINA_MAX,
+  PLAYER_MAX_HP, STAMINA_MAX,
   GAME_W, GAME_H, TOPBAR_H,
 } from '../config/constants.js';
 
@@ -24,15 +24,15 @@ export class UIScene extends Phaser.Scene {
     this.armorText = this.add.text(140, 6, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#90caf9',
     });
-    this.ammoText = this.add.text(260, 6, '', {
-      fontFamily: 'monospace', fontSize: '16px', color: '#fff176',
-    });
-    this.weaponText = this.add.text(420, 26, '', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#fff59d',
-    });
     this.shieldText = this.add.text(220, 6, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#9fa8da',
     });
+    // оружие: лейбл + xp-бар, прогресс к следующему уровню
+    this.weaponLabel = this.add.text(260, 4, '', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#fff59d',
+    });
+    this.weaponBarBg = this.add.rectangle(260, 22, 70, 4, 0x333333).setOrigin(0, 0);
+    this.weaponBar   = this.add.rectangle(260, 22, 0,  4, 0xfff59d).setOrigin(0, 0);
     this.keysText = this.add.text(340, 6, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#dddddd',
     });
@@ -53,7 +53,6 @@ export class UIScene extends Phaser.Scene {
     }).setOrigin(0.5, 0);
 
     this.onUpdate({ hp: PLAYER_MAX_HP });
-    this.onUpdate({ ammo: STARTING_AMMO });
     this.onUpdate({ stamina: STAMINA_MAX });
     this.onUpdate({ keys: [] });
     this.onUpdate({ armor: 0 });
@@ -68,7 +67,6 @@ export class UIScene extends Phaser.Scene {
     if (state.hp != null) {
       this.hpText.setText('HP: ' + '♥'.repeat(state.hp) + '♡'.repeat(PLAYER_MAX_HP - state.hp));
     }
-    if (state.ammo != null) this.ammoText.setText('● ' + state.ammo);
     if (state.stamina != null) this.staminaBar.width = 120 * (state.stamina / 100);
     if (state.keys != null) {
       for (const i of this.keyIcons) i.destroy();
@@ -102,7 +100,8 @@ export class UIScene extends Phaser.Scene {
     }
     if (state.weaponLevel != null) {
       const xp = state.weaponXp ?? 0;
-      this.weaponText.setText(`WPN lvl ${state.weaponLevel}  (${xp}/5)`);
+      this.weaponLabel.setText(`Оружие  ур. ${state.weaponLevel}`);
+      this.weaponBar.width = 80 * Math.min(1, xp / 5);
     }
   }
 }

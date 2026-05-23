@@ -1,5 +1,5 @@
 import {
-  PLAYER_SPEED, PLAYER_SIZE, PLAYER_MAX_HP, FIRE_RATE_MS, STARTING_AMMO,
+  PLAYER_SPEED, PLAYER_SIZE, PLAYER_MAX_HP, FIRE_RATE_MS, FIRE_RATE_PER_LEVEL, STARTING_AMMO,
   STAMINA_MAX, STAMINA_SPRINT_PER_SEC, STAMINA_REGEN_PER_SEC,
   SPRINT_MULTIPLIER, DASH_DISTANCE, DASH_DURATION_MS, DASH_COOLDOWN_MS, DASH_STAMINA_COST,
   ARMOR_MAX, ARMOR_REGEN_DELAY_MS, SLOW_MULTIPLIER,
@@ -42,8 +42,10 @@ export class Player {
   }
 
   upgradeWeapon() {
-    this.weaponLevel = Math.min(WEAPON_MAX_LEVEL, this.weaponLevel + 1);
+    if (this.weaponLevel >= WEAPON_MAX_LEVEL) return;
+    this.weaponLevel++;
     this.weaponXp = 0;
+    this.scene.showToast?.(`Оружие → ур. ${this.weaponLevel}`, '#fff59d');
   }
 
   addWeaponXp(n = 1) {
@@ -52,6 +54,7 @@ export class Player {
     if (this.weaponXp >= WEAPON_XP_PER_LEVEL) {
       this.weaponXp -= WEAPON_XP_PER_LEVEL;
       this.weaponLevel++;
+      this.scene.showToast?.(`Оружие → ур. ${this.weaponLevel}`, '#fff59d');
     }
   }
 
@@ -68,13 +71,15 @@ export class Player {
 
   setAim(aim) { this.aim = aim; }
 
+  // бесконечные снаряды — ограничен только fire-rate'ом (и его рапид-баффом)
   tryShoot(now) {
     if (!this.aim) return null;
-    if (this.ammo <= 0) return null;
     if (now < this.nextShotAt) return null;
-    this.ammo -= 1;
-    const factor = (this.scene.gameState && hasEffect(this.scene.gameState, 'rapid_fire')) ? RAPID_FIRE_FACTOR : 1;
-    this.nextShotAt = now + FIRE_RATE_MS * factor;
+    let interval = FIRE_RATE_MS * (1 - FIRE_RATE_PER_LEVEL * (this.weaponLevel - 1));
+    if (this.scene.gameState && hasEffect(this.scene.gameState, 'rapid_fire')) {
+      interval *= RAPID_FIRE_FACTOR;
+    }
+    this.nextShotAt = now + interval;
     return { x: this.aim.x, y: this.aim.y, ox: this.sprite.x, oy: this.sprite.y };
   }
 

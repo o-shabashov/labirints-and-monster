@@ -3,7 +3,6 @@ import { GAME_W, GAME_H, TOPBAR_H, CANVAS_H } from '../config/constants.js';
 const LABELS = {
   armor:        { name: 'Броня',          desc: '+2 щита', color: 0x90caf9 },
   heal:         { name: 'Аптечка',        desc: '+1 HP', color: 0xa3d977 },
-  ammo:         { name: 'Патроны',        desc: '+10 пуль', color: 0xfff176 },
   compass:      { name: 'Компас',         desc: '20с — стрелка к выходу', color: 0xffd54f },
   lure:         { name: 'Приманка',       desc: '+1 заряд, отвлекает врагов', color: 0xce93d8 },
   speed:        { name: 'Быстрота',       desc: '+40% скорости, 20с', color: 0x80deea },

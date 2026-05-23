@@ -2,7 +2,7 @@ import {
   TILE, TILE_SIZE, GRID_W, GRID_H, GAME_W, GAME_H, TOPBAR_H, VISION_RADIUS_TILES,
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
-  COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES, AMMO_PACK,
+  COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES,
   SPEED_BOOST_DURATION_MS, DAMAGE_BOOST_DURATION_MS, RAPID_FIRE_DURATION_MS,
   VISION_BOOST_DURATION_MS, REGEN_DURATION_MS, REGEN_TICK_MS,
   EXHAUSTED_DURATION_MS, WEAKNESS_DURATION_MS,
@@ -79,34 +79,25 @@ export class GameScene extends Phaser.Scene {
           if (Math.hypot(dx, dy) >= minDistTiles) candidates.push({ x, y });
         }
       }
-      // плотнее: 5 wanderer + 3 chaser + 2 guard + 2 shooter = 12.
+      // 12 wanderer + 7 chaser + 4 guard + 4 shooter = 27 на старте.
       const plan = [
-        ...Array(5).fill(Wanderer),
-        ...Array(3).fill(Chaser),
-        ...Array(2).fill(Guard),
-        ...Array(2).fill(Shooter),
+        ...Array(12).fill(Wanderer),
+        ...Array(7).fill(Chaser),
+        ...Array(4).fill(Guard),
+        ...Array(4).fill(Shooter),
       ];
       for (const Cls of plan) {
         if (candidates.length === 0) break;
         const idx = Math.floor(Math.random() * candidates.length);
         const c = candidates.splice(idx, 1)[0];
         const w = this.map.tileToWorld(c.x, c.y);
-        const m = new Cls(this, w.x, w.y);
-        this.physics.add.collider(m.sprite, this.map.walls);
-        this.physics.add.overlap(this.player.sprite, m.sprite, () => {
-          const took = this.player.takeHit(m.sprite.x, m.sprite.y);
-          if (took) {
-            this.sound.playerHurt();
-            this.game.events.emit('hud:update', { hp: this.player.hp });
-            if (this.player.isDead()) {
-              this.sound.gameover();
-              this.scene.start('GameOverScene', this.buildSummary());
-            }
-          }
-        });
-        this.monsters.push(m);
+        this.spawnMonster(Cls, w.x, w.y);
       }
     }
+    // респаун-таймеры (волны чаще и злее)
+    this.nextRespawnAt = this.time.now + 8000;
+    this.nextWaveAt    = this.time.now + 18000;
+    this.MAX_MONSTERS  = 80;  // cap чтобы не разнести FPS
 
     this.fog = new FogOfWar(this, GRID_W, GRID_H);
     this.player.sprite.setDepth(5);  // под маской, но над полом
@@ -226,9 +217,10 @@ export class GameScene extends Phaser.Scene {
           if (!m.sprite.active) continue;
           this.physics.add.overlap(b.sprite, m.sprite, () => {
             if (b.dead || !m.sprite.active) return;
+            const hitX = b.sprite.x, hitY = b.sprite.y;
             b.kill();
             this.sound.hit();
-            if (m.takeDamage(dmg)) {
+            if (m.takeDamage(dmg, hitX, hitY)) {
               this.sound.monsterKilled();
               this.stats.monstersKilled++;
               this.player.addWeaponXp();
@@ -249,6 +241,7 @@ export class GameScene extends Phaser.Scene {
     this.bullets = this.bullets.filter(b => !b.dead);
 
     for (const m of this.monsters) m.update(delta, this.player, this.map);
+    this.tickSpawns();
 
     // вражеские снаряды — летят прямолинейно от Shooter'а
     for (const p of this.enemyProjectiles) {
@@ -345,7 +338,6 @@ export class GameScene extends Phaser.Scene {
     // HUD — единый emit с полным состоянием
     this.game.events.emit('hud:update', {
       hp: this.player.hp,
-      ammo: this.player.ammo,
       stamina: this.player.stamina,
       armor: this.player.armor,
       shield: this.player.shieldCharges || 0,
@@ -364,7 +356,6 @@ export class GameScene extends Phaser.Scene {
       // мгновенные
       case 'armor':           this.player.addArmor(2); break;
       case 'heal':            this.player.heal(1); break;
-      case 'ammo':            this.player.ammo += AMMO_PACK; break;
       case 'lure':            this.player.lureCharges = (this.player.lureCharges || 0) + 1; break;
       case 'shield':          this.player.shieldCharges = (this.player.shieldCharges || 0) + 1; break;
       case 'weapon_upgrade':  this.player.upgradeWeapon(); break;
@@ -377,7 +368,7 @@ export class GameScene extends Phaser.Scene {
       case 'regen':           addEffect(this.gameState, 'regen', REGEN_DURATION_MS, { nextTickAt: performance.now() + REGEN_TICK_MS }); break;
     }
     const labels = {
-      armor: 'Броня +2', heal: '+1 HP', ammo: '+10 патронов', lure: 'Приманка +1',
+      armor: 'Броня +2', heal: '+1 HP', lure: 'Приманка +1',
       shield: 'Щит +1', weapon_upgrade: 'Оружие +1 уровень',
       compass: 'Компас', speed: 'Быстрота', damage: 'Сила атаки',
       rapid_fire: 'Скорострел', vision_boost: 'Глаз филина', regen: 'Регенерация',
@@ -468,6 +459,96 @@ export class GameScene extends Phaser.Scene {
       }
     });
     this.enemyProjectiles.push(proj);
+  }
+
+  // Универсальный спавн монстра — initial и для волн/респаунов. Привязывает
+  // обычные коллайдеры и overlap c игроком (с takeHit и GameOver-on-death).
+  spawnMonster(Cls, wx, wy) {
+    const m = new Cls(this, wx, wy);
+    this.physics.add.collider(m.sprite, this.map.walls);
+    this.physics.add.overlap(this.player.sprite, m.sprite, () => {
+      const took = this.player.takeHit(m.sprite.x, m.sprite.y);
+      if (took) {
+        this.sound.playerHurt();
+        this.game.events.emit('hud:update', { hp: this.player.hp });
+        if (this.player.isDead()) {
+          this.sound.gameover();
+          this.scene.start('GameOverScene', this.buildSummary());
+        }
+      }
+    });
+    this.monsters.push(m);
+    return m;
+  }
+
+  // Случайный тип с разумным весом. Чем дольше идёт партия — тем чаще шутеры.
+  pickMonsterClass() {
+    const elapsedSec = (this.time.now - this.stats.startedAt) / 1000;
+    const shooterWeight = Math.min(0.35, 0.1 + elapsedSec / 300);  // до 35%
+    const r = Math.random();
+    if (r < shooterWeight) return Shooter;
+    if (r < shooterWeight + 0.25) return Chaser;
+    if (r < shooterWeight + 0.45) return Guard;
+    return Wanderer;
+  }
+
+  // FLOOR-клетка далеко от игрока — чтобы новые враги не появлялись на голове
+  spawnTileFarFromPlayer(minTiles = 6) {
+    const ptx = Math.floor(this.player.sprite.x / TILE_SIZE);
+    const pty = Math.floor(this.player.sprite.y / TILE_SIZE);
+    const candidates = [];
+    for (let y = 1; y < GRID_H - 1; y++) {
+      for (let x = 1; x < GRID_W - 1; x++) {
+        if (this.map.tiles[y][x] !== TILE.FLOOR) continue;
+        if (Math.hypot(x - ptx, y - pty) < minTiles) continue;
+        candidates.push({ x, y });
+      }
+    }
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  spawnRandomMonster(forcedClass = null) {
+    if (this.monsters.length >= this.MAX_MONSTERS) return null;
+    const tile = this.spawnTileFarFromPlayer();
+    if (!tile) return null;
+    const w = this.map.tileToWorld(tile.x, tile.y);
+    return this.spawnMonster(forcedClass || this.pickMonsterClass(), w.x, w.y);
+  }
+
+  // L4D-style толпы. Три варианта:
+  //   horde: 10–15 wanderer'ов лезут со всех сторон (классический "horde")
+  //   sprint: 6–8 chaser'ов — несутся прямо к игроку
+  //   mixed: 8–12 смешанная толпа
+  triggerHorde() {
+    const r = Math.random();
+    let label, count, fixed;
+    if (r < 0.4) {
+      label = '🩸 Орда!'; count = 14 + Math.floor(Math.random() * 8); fixed = Wanderer;
+    } else if (r < 0.7) {
+      label = '⚡ Спринт!'; count = 8 + Math.floor(Math.random() * 4); fixed = Chaser;
+    } else {
+      label = '☠ Засада!'; count = 12 + Math.floor(Math.random() * 6); fixed = null;
+    }
+    for (let i = 0; i < count; i++) this.spawnRandomMonster(fixed);
+    this.showToast(label, '#ff5252');
+  }
+
+  tickSpawns() {
+    const now = this.time.now;
+    if (now >= this.nextRespawnAt) {
+      const burst = 2 + (Math.random() < 0.5 ? 1 : 0);  // 2–3 за тик
+      for (let i = 0; i < burst; i++) this.spawnRandomMonster();
+      const elapsedSec = (now - this.stats.startedAt) / 1000;
+      const interval = Math.max(3500, 8000 - elapsedSec * 60);
+      this.nextRespawnAt = now + interval;
+    }
+    if (now >= this.nextWaveAt) {
+      if (Math.random() < 0.65) {
+        this.triggerHorde();
+      }
+      this.nextWaveAt = now + 18000;
+    }
   }
 
   // ближайший монстр в радиусе зрения и без стен на луче от точки выстрела

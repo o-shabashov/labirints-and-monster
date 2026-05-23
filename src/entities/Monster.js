@@ -17,7 +17,7 @@ export class Monster {
     this.dying = false;
   }
 
-  takeDamage(n = 1) {
+  takeDamage(n = 1, fromX = null, fromY = null) {
     if (this.dying) return false;
     this.hp -= n;
     if (this.hp > 0) {
@@ -26,13 +26,22 @@ export class Monster {
       this.scene.time.delayedCall(100, () => {
         if (this.sprite && this.sprite.active) this.sprite.setTint(this.baseTint);
       });
-      // лёгкий kickback по scale для feedback
+      // squash & stretch
       this.scene.tweens.add({
         targets: this.sprite,
         scaleX: { from: this.sprite.scaleX * 1.3, to: this.sprite.scaleX },
         scaleY: { from: this.sprite.scaleY * 0.8, to: this.sprite.scaleY },
         duration: 110,
       });
+      // импакт: knockback от точки попадания + кратковременный «стан» AI
+      if (fromX != null && fromY != null && this.sprite.body) {
+        const dx = this.sprite.x - fromX;
+        const dy = this.sprite.y - fromY;
+        const len = Math.hypot(dx, dy) || 1;
+        const KICK = 260;
+        this.sprite.body.setVelocity((dx / len) * KICK, (dy / len) * KICK);
+        this.stunUntil = this.scene.time.now + 220;
+      }
       return false;
     }
     // смерть — анимация затухания и спин
@@ -87,6 +96,11 @@ export class Monster {
     this.sprite.body.setVelocity(vx, vy);
     // flip спрайта по направлению движения; 0x72-арт смотрит вправо в дефолте
     if (Math.abs(vx) > 1) this.sprite.setFlipX(vx < 0);
+  }
+
+  // подклассы могут перехватить этот guard в начале своих update'ов
+  isStunned() {
+    return this.stunUntil && this.scene.time.now < this.stunUntil;
   }
 
   update(_dt, _player, _map) {

@@ -21,6 +21,7 @@ export class Shooter extends Monster {
   }
 
   update(_dt, player, map) {
+    if (this.isStunned()) return;
     this.sprite.body.setVelocity(0, 0);
     const now = this.scene.time.now;
     if (now < this.nextShotAt) return;
