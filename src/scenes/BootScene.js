@@ -128,25 +128,23 @@ export class BootScene extends Phaser.Scene {
 
     g.destroy();
 
-    // Плавное «кольцо» затемнения у границы видимости — feathering между
-    // нормально освещённым центром и затемнённой explored-памятью снаружи.
-    // Внутри ~70% радиуса и полностью за его пределами — прозрачно. Сам fog
-    // и dim сейчас рисуются тайлово в FogOfWar, vignette только сглаживает
-    // их «блочный» край.
+    // Soft circular brush: белый круг с плавным альфа-спадом от 1 в центре
+    // до 0 на радиусе. Используется FogOfWar для:
+    //   1) накопления explored-маски (штампуется в RenderTexture при движении)
+    //   2) текущей vision-маски (image у позиции игрока)
+    // Один и тот же brush для обеих ролей — отличается только применением.
     const radius = VISION_RADIUS_TILES * TILE_SIZE;
-    const size = radius * 3;
+    const size = radius * 2;
     const cv = document.createElement('canvas');
     cv.width = cv.height = size;
     const cx = cv.getContext('2d');
-    cx.clearRect(0, 0, size, size);
-    const grad = cx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, radius * 1.05);
-    grad.addColorStop(0.0,  'rgba(0,0,0,0)');
-    grad.addColorStop(0.65, 'rgba(0,0,0,0)');
-    grad.addColorStop(0.92, 'rgba(0,0,0,0.55)');
-    grad.addColorStop(1.0,  'rgba(0,0,0,0)');
+    const grad = cx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, radius);
+    grad.addColorStop(0.0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.6, 'rgba(255,255,255,0.85)');
+    grad.addColorStop(1.0, 'rgba(255,255,255,0)');
     cx.fillStyle = grad;
     cx.fillRect(0, 0, size, size);
-    this.textures.addCanvas('vignette', cv);
+    this.textures.addCanvas('soft_circle', cv);
 
     this.scene.start('MenuScene');
   }

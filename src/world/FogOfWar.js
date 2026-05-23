@@ -1,27 +1,59 @@
-import { TILE_SIZE, VISION_RADIUS_TILES, BLINDNESS_VISION_RATIO } from '../config/constants.js';
+import {
+  TILE_SIZE, GAME_W, GAME_H,
+  VISION_RADIUS_TILES, BLINDNESS_VISION_RATIO,
+} from '../config/constants.js';
 import { hasEffect } from '../systems/Effects.js';
 
-// Три слоя:
-//   depth 9  — dim per-tile: чёрный 0.78 alpha поверх explored клеток, которые
-//              сейчас вне vision-радиуса. Это «помню, но не вижу».
-//   depth 10 — fog per-tile: solid чёрный для всего unexplored.
-//   depth 11 — radial vignette image, центрированная на игроке. Прозрачная
-//              в центре и за пределами vision, max затемнения у границы —
-//              сглаживает «блочный» переход между vision и dim/fog.
+// Плавный fog без тайловой разбивки. Идея:
+//
+//   accExplored RenderTexture (невидимый) накапливает soft brush в позиции
+//   игрока каждый кадр — это «карта памяти» с альфа-градиентом по краям.
+//
+//   visionMask Image (невидимый) — тот же soft brush, привязанный к игроку,
+//   меняется каждый кадр. Это маска «то, что вижу прямо сейчас».
+//
+//   outerFog — сплошной чёрный rectangle alpha=1 на весь мир, с inverted
+//   bitmap-маской по accExplored. Виден только там, где игрок ни разу не
+//   был. Невиденное = solid black.
+//
+//   memoryDim — сплошной чёрный rectangle alpha=0.78 на весь мир, с inverted
+//   bitmap-маской по visionMask. Виден там, где НЕ в текущем зрении.
+//   Поверх accExplored-памяти даёт «помню коридор, но не сейчас», а в
+//   текущем круге vision полностью прозрачен.
+//
+// Композиция:
+//   vision-зона       → ничего не накладывается, виден мир в полном цвете
+//   explored-память   → только memoryDim 0.78
+//   unexplored        → memoryDim + outerFog = полностью чёрный
+//
+// Vignette/soft falloff одинаковый для всех трёх границ, потому что обе
+// маски используют один и тот же gradient brush.
 export class FogOfWar {
   constructor(scene, gridW, gridH) {
     this.scene = scene;
     this.gridW = gridW;
     this.gridH = gridH;
+    // explored-сетка нужна для статистики Victory/GameOver
     this.explored = Array.from({ length: gridH }, () => new Array(gridW).fill(false));
 
-    this.dim = scene.add.graphics();
-    this.dim.setDepth(9);
+    // накопитель explored-памяти (невидим, используется только как mask source)
+    this.accExplored = scene.add.renderTexture(0, 0, GAME_W, GAME_H).setOrigin(0, 0).setVisible(false);
 
-    this.fog = scene.add.graphics();
-    this.fog.setDepth(10);
+    // динамическая vision-маска (невидима, используется как mask source)
+    this.visionMask = scene.add.image(0, 0, 'soft_circle').setOrigin(0.5).setVisible(false);
 
-    this.vignette = scene.add.image(0, 0, 'vignette').setOrigin(0.5).setDepth(11);
+    // outerFog — чёрный для unexplored
+    this.outerFog = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 1).setOrigin(0, 0).setDepth(10);
+    const exploredMask = new Phaser.Display.Masks.BitmapMask(scene, this.accExplored);
+    exploredMask.invertAlpha = true;
+    this.outerFog.setMask(exploredMask);
+
+    // memoryDim — приглушение explored-зоны вне current vision
+    this.memoryDim = scene.add.rectangle(0, 0, GAME_W, GAME_H, 0x000000, 0.78).setOrigin(0, 0).setDepth(11);
+    const vMask = new Phaser.Display.Masks.BitmapMask(scene, this.visionMask);
+    vMask.invertAlpha = true;
+    this.memoryDim.setMask(vMask);
+
     this.fullRadiusPx = VISION_RADIUS_TILES * TILE_SIZE;
     this.currentRadiusPx = this.fullRadiusPx;
   }
@@ -31,8 +63,15 @@ export class FogOfWar {
     const radiusTiles = blind ? Math.ceil(VISION_RADIUS_TILES * BLINDNESS_VISION_RATIO) : VISION_RADIUS_TILES;
     const radiusPx = radiusTiles * TILE_SIZE;
     this.currentRadiusPx = radiusPx;
+    const scale = radiusPx / this.fullRadiusPx;
 
-    // расширяем explored
+    // штампуем soft brush в accumulator — память накапливается с плавными краями
+    this.accExplored.draw('soft_circle', playerX - this.fullRadiusPx * scale, playerY - this.fullRadiusPx * scale, 1, 0xffffff);
+    // подгоняем размер бруша под blindness — RT.draw не масштабирует напрямую,
+    // поэтому при blindness draw'ом мы рисуем тот же brush, но dim/vision
+    // mask отскейлится через visionMask ниже — это даёт корректное сужение.
+
+    // обновляем explored-сетку для статистики
     const tx = Math.floor(playerX / TILE_SIZE);
     const ty = Math.floor(playerY / TILE_SIZE);
     const r = radiusTiles;
@@ -45,34 +84,8 @@ export class FogOfWar {
       }
     }
 
-    // explored клетки вне текущего vision — приглушаем
-    this.dim.clear();
-    this.dim.fillStyle(0x000000, 0.78);
-    const radiusPxSq = radiusPx * radiusPx;
-    for (let y = 0; y < this.gridH; y++) {
-      for (let x = 0; x < this.gridW; x++) {
-        if (!this.explored[y][x]) continue;
-        const cx = x * TILE_SIZE + TILE_SIZE / 2;
-        const cy = y * TILE_SIZE + TILE_SIZE / 2;
-        const ddx = cx - playerX, ddy = cy - playerY;
-        if (ddx * ddx + ddy * ddy > radiusPxSq) {
-          this.dim.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        }
-      }
-    }
-
-    // unexplored — solid black
-    this.fog.clear();
-    this.fog.fillStyle(0x000000, 1);
-    for (let y = 0; y < this.gridH; y++) {
-      for (let x = 0; x < this.gridW; x++) {
-        if (this.explored[y][x]) continue;
-        this.fog.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-      }
-    }
-
-    // vignette — feathering на границе vision
-    this.vignette.setPosition(playerX, playerY);
-    this.vignette.setScale(radiusPx / this.fullRadiusPx);
+    // двигаем vision mask к игроку и масштабируем (blindness уменьшает)
+    this.visionMask.setPosition(playerX, playerY);
+    this.visionMask.setScale(scale);
   }
 }
