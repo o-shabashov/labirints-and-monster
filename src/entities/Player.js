@@ -2,8 +2,10 @@ import {
   PLAYER_SPEED, PLAYER_MAX_HP, FIRE_RATE_MS, STARTING_AMMO,
   STAMINA_MAX, STAMINA_SPRINT_PER_SEC, STAMINA_REGEN_PER_SEC,
   SPRINT_MULTIPLIER, DASH_DISTANCE, DASH_DURATION_MS, DASH_COOLDOWN_MS,
+  ARMOR_MAX, ARMOR_REGEN_DELAY_MS, SLOW_MULTIPLIER,
 } from '../config/constants.js';
 import { applyKnockback, KNOCKBACK_DURATION, INVULNERABILITY_DURATION } from '../systems/Combat.js';
+import { hasEffect } from '../systems/Effects.js';
 
 export class Player {
   constructor(scene, x, y) {
@@ -21,6 +23,9 @@ export class Player {
     this.dashCooldownUntil = 0;
     this.dashDir = null;
     this.keys = new Set();   // 'r', 'g', 'b'
+    this.armor = 0;
+    this.lastDamageAt = 0;
+    this.lureCharges = 0;
   }
 
   addKey(color) { this.keys.add(color); }
@@ -40,7 +45,12 @@ export class Player {
   takeHit(fromX, fromY) {
     const now = this.scene.time.now;
     if (now < this.iframesUntil) return false;
-    this.hp -= 1;
+    if (this.armor > 0) {
+      this.armor -= 1;
+    } else {
+      this.hp -= 1;
+    }
+    this.lastDamageAt = now;
     this.iframesUntil = now + INVULNERABILITY_DURATION;
     this.knockbackUntil = now + KNOCKBACK_DURATION;
     applyKnockback(this.sprite, fromX, fromY);
@@ -58,6 +68,17 @@ export class Player {
 
   heal(n) {
     this.hp = Math.min(this.hp + n, PLAYER_MAX_HP);
+  }
+
+  addArmor(n) {
+    this.armor = Math.min(this.armor + n, ARMOR_MAX);
+  }
+
+  regenArmorTick(now) {
+    if (now - this.lastDamageAt > ARMOR_REGEN_DELAY_MS && this.armor < ARMOR_MAX) {
+      this.armor = Math.min(this.armor + 1, ARMOR_MAX);
+      this.lastDamageAt = now; // следующая регенерация через 8 сек
+    }
   }
 
   update(input) {
@@ -91,6 +112,10 @@ export class Player {
       this.stamina = Math.max(0, this.stamina - STAMINA_SPRINT_PER_SEC * dtSec);
     } else {
       this.stamina = Math.min(STAMINA_MAX, this.stamina + STAMINA_REGEN_PER_SEC * dtSec);
+    }
+
+    if (this.scene.gameState && hasEffect(this.scene.gameState, 'slow')) {
+      speed *= SLOW_MULTIPLIER;
     }
 
     this.sprite.body.setVelocity(input.move.x * speed, input.move.y * speed);

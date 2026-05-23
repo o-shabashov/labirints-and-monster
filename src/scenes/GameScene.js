@@ -1,4 +1,9 @@
-import { TILE, TILE_SIZE, GRID_W, GRID_H } from '../config/constants.js';
+import {
+  TILE, TILE_SIZE, GRID_W, GRID_H, VISION_RADIUS_TILES,
+  POISON_TICK_MS, POISON_TICKS,
+  SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
+  COMPASS_DURATION_MS, LURE_DURATION_MS, AMMO_PACK,
+} from '../config/constants.js';
 import { TileMap } from '../world/TileMap.js';
 import { Player } from '../entities/Player.js';
 import { generateMaze } from '../world/MazeGenerator.js';
@@ -10,6 +15,8 @@ import { Guard } from '../entities/monsters/Guard.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
 import { Door } from '../entities/Door.js';
+import { Chest } from '../entities/Chest.js';
+import { addEffect, hasEffect, tickEffects } from '../systems/Effects.js';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -19,6 +26,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.scene.launch('UIScene');
 
+    this.gameState = { effects: [] };
     this.bullets = [];
 
     const seed = Date.now();
@@ -78,8 +86,10 @@ export class GameScene extends Phaser.Scene {
     this.player.sprite.setDepth(5);  // под маской, но над полом
 
     this.pickups = [];
+    this.chests = [];
     const deadEnds = findDeadEnds(this.map.tiles);
-    for (let i = 0; i < Math.min(3, deadEnds.length); i++) {
+    // 3 клетки для аптечек
+    for (let i = 0; i < 3 && deadEnds.length; i++) {
       const idx = Math.floor(Math.random() * deadEnds.length);
       const c = deadEnds.splice(idx, 1)[0];
       const w = this.map.tileToWorld(c.x, c.y);
@@ -91,6 +101,18 @@ export class GameScene extends Phaser.Scene {
       });
       this.pickups.push(p);
     }
+    // 4 клетки для сундуков
+    for (let i = 0; i < 4 && deadEnds.length; i++) {
+      const idx = Math.floor(Math.random() * deadEnds.length);
+      const c = deadEnds.splice(idx, 1)[0];
+      const w = this.map.tileToWorld(c.x, c.y);
+      const ch = new Chest(this, w.x, w.y);
+      this.chests.push(ch);
+    }
+    this.nearestChest = null;
+
+    // компас — стрелка-точка на краю круга видимости
+    this.compassArrow = this.add.graphics().setDepth(12);
 
     // двери (по тайлам в map) и ключи (по keySpec)
     this.doors = [];
@@ -125,7 +147,6 @@ export class GameScene extends Phaser.Scene {
     const input = this.inputSys.read();
     this.player.setAim(input.aim);
     this.player.update(input);
-    this.game.events.emit('hud:update', { stamina: this.player.stamina });
 
     // стрельба
     if (input.shoot) {
@@ -144,7 +165,6 @@ export class GameScene extends Phaser.Scene {
           });
         }
         this.bullets.push(b);
-        this.game.events.emit('hud:update', { hp: this.player.hp, ammo: this.player.ammo });
       }
     }
 
@@ -154,7 +174,78 @@ export class GameScene extends Phaser.Scene {
     this.bullets = this.bullets.filter(b => !b.dead);
 
     for (const m of this.monsters) m.update(delta, this.player, this.map);
+
+    // найти сундук в радиусе <1 тайла для подсказки и взаимодействия
+    this.nearestChest = null;
+    for (const ch of this.chests) {
+      if (ch.opened) continue;
+      const d = Math.hypot(ch.sprite.x - this.player.sprite.x, ch.sprite.y - this.player.sprite.y);
+      if (d < TILE_SIZE) { this.nearestChest = ch; break; }
+    }
+    if (input.interact && this.nearestChest) {
+      const reward = this.nearestChest.open();
+      this.applyChestReward(reward);
+      this.chests = this.chests.filter(c => !c.opened);
+      this.nearestChest = null;
+    }
+
+    // эффекты во времени
+    const pNow = performance.now();
+    tickEffects(this.gameState, pNow);
+    // отравление: каждые POISON_TICK_MS — -1 HP, всего POISON_TICKS раз
+    const poison = this.gameState.effects.find(e => e.type === 'poison');
+    if (poison && pNow >= (poison.nextTickAt || 0) && (poison.ticks || 0) < POISON_TICKS) {
+      this.player.hp = Math.max(0, this.player.hp - 1);
+      poison.ticks = (poison.ticks || 0) + 1;
+      poison.nextTickAt = pNow + POISON_TICK_MS;
+      if (this.player.isDead()) {
+        this.scene.start('GameOverScene');
+        return;
+      }
+    }
+
+    // armor regen
+    this.player.regenArmorTick(this.time.now);
+
+    // компас
+    this.compassArrow.clear();
+    if (hasEffect(this.gameState, 'compass') && this.map.exit) {
+      const ex = this.map.exit.x * TILE_SIZE + TILE_SIZE / 2;
+      const ey = this.map.exit.y * TILE_SIZE + TILE_SIZE / 2;
+      const dx = ex - this.player.sprite.x;
+      const dy = ey - this.player.sprite.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const r = (VISION_RADIUS_TILES - 1) * TILE_SIZE;
+      const px = this.player.sprite.x + (dx / len) * r;
+      const py = this.player.sprite.y + (dy / len) * r;
+      this.compassArrow.fillStyle(0xffd54f, 1);
+      this.compassArrow.fillCircle(px, py, 5);
+    }
+
     this.fog.update(this.player.sprite.x, this.player.sprite.y);
+
+    // HUD — единый emit с полным состоянием
+    this.game.events.emit('hud:update', {
+      hp: this.player.hp,
+      ammo: this.player.ammo,
+      stamina: this.player.stamina,
+      armor: this.player.armor,
+      effects: this.gameState.effects.map(e => ({ type: e.type, msLeft: e.expiresAt - pNow })),
+      interactHint: this.nearestChest ? 'E / X — открыть сундук' : '',
+    });
+  }
+
+  applyChestReward(type) {
+    switch (type) {
+      case 'armor':    this.player.addArmor(2); break;
+      case 'heal':     this.player.heal(1); break;
+      case 'ammo':     this.player.ammo += AMMO_PACK; break;
+      case 'compass':  addEffect(this.gameState, 'compass', COMPASS_DURATION_MS); break;
+      case 'lure':     this.player.lureCharges = (this.player.lureCharges || 0) + 1; break;
+      case 'poison':   addEffect(this.gameState, 'poison', POISON_TICK_MS * POISON_TICKS, { nextTickAt: performance.now(), ticks: 0 }); break;
+      case 'slow':     addEffect(this.gameState, 'slow', SLOW_DURATION_MS); break;
+      case 'blindness':addEffect(this.gameState, 'blindness', BLINDNESS_DURATION_MS); break;
+    }
   }
 }
 

@@ -109,6 +109,23 @@ export class BootScene extends Phaser.Scene {
       g.clear();
     }
 
+    // chest
+    g.fillStyle(COLOR.CHEST, 1);
+    g.fillRoundedRect(2, 6, 20, 16, 3);
+    g.lineStyle(2, 0x000000, 1);
+    g.strokeRoundedRect(2, 6, 20, 16, 3);
+    g.fillStyle(0xffd54f, 1);
+    g.fillRect(10, 12, 4, 4);
+    g.generateTexture('chest', 24, 24);
+    g.clear();
+
+    // ammo pickup
+    g.fillStyle(0xfff176, 1);
+    g.fillRect(2, 6, 12, 4);
+    g.fillRect(2, 10, 12, 4);
+    g.generateTexture('pickup_ammo', 16, 16);
+    g.clear();
+
     g.destroy();
 
     this.scene.start('GameScene');

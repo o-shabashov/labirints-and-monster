@@ -58,3 +58,17 @@ export const DASH_COOLDOWN_MS = 1500;
 export const WANDERER_VISION_TILES = 4;
 export const WANDERER_LOSE_INTEREST_MS = 3000;
 export const GUARD_PATROL_HALF = 1;  // охраняет 3×3 => half=1
+
+export const ARMOR_MAX = 2;
+export const ARMOR_REGEN_DELAY_MS = 8000;
+export const POISON_TICK_MS = 4000;
+export const POISON_TICKS = 4;
+export const SLOW_DURATION_MS = 8000;
+export const SLOW_MULTIPLIER = 0.7;
+export const BLINDNESS_DURATION_MS = 6000;
+export const BLINDNESS_VISION_RATIO = 0.5;
+export const COMPASS_DURATION_MS = 20000;
+export const LURE_DURATION_MS = 5000;
+export const LURE_RANGE_TILES = 8;
+export const LURE_THROW_TILES = 6;
+export const AMMO_PACK = 6;

@@ -1,4 +1,5 @@
-import { TILE_SIZE, GAME_W, GAME_H, VISION_RADIUS_TILES } from '../config/constants.js';
+import { TILE_SIZE, GAME_W, GAME_H, VISION_RADIUS_TILES, BLINDNESS_VISION_RATIO } from '../config/constants.js';
+import { hasEffect } from '../systems/Effects.js';
 
 export class FogOfWar {
   constructor(scene, gridW, gridH) {
@@ -19,10 +20,15 @@ export class FogOfWar {
   }
 
   update(playerX, playerY) {
+    // если в state есть blindness → радиус в 2 раза меньше
+    const blind = this.scene.gameState ? hasEffect(this.scene.gameState, 'blindness') : false;
+    const radiusTiles = blind ? Math.ceil(VISION_RADIUS_TILES * BLINDNESS_VISION_RATIO) : VISION_RADIUS_TILES;
+    const radiusPx = radiusTiles * TILE_SIZE;
+
     // mark explored tiles within current vision
     const tx = Math.floor(playerX / TILE_SIZE);
     const ty = Math.floor(playerY / TILE_SIZE);
-    const r = VISION_RADIUS_TILES;
+    const r = radiusTiles;
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (dx * dx + dy * dy > r * r) continue;
@@ -41,7 +47,7 @@ export class FogOfWar {
         const cx = x * TILE_SIZE + TILE_SIZE / 2;
         const cy = y * TILE_SIZE + TILE_SIZE / 2;
         const dxp = cx - playerX, dyp = cy - playerY;
-        if (dxp * dxp + dyp * dyp > this.radiusPx * this.radiusPx) {
+        if (dxp * dxp + dyp * dyp > radiusPx * radiusPx) {
           this.dim.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
       }
