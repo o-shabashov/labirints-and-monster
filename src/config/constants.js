@@ -3,6 +3,8 @@ export const GRID_W = 31;  // нечётное — удобно для recursive
 export const GRID_H = 21;
 export const GAME_W = GRID_W * TILE_SIZE;  // 992
 export const GAME_H = GRID_H * TILE_SIZE;  // 672
+export const TOPBAR_H = 48;
+export const CANVAS_H = GAME_H + TOPBAR_H;  // 720
 
 export const COLOR = {
   BG:        0x111418,

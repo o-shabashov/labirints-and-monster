@@ -4,12 +4,12 @@ import { GameScene } from './scenes/GameScene.js';
 import { UIScene } from './scenes/UIScene.js';
 import { GameOverScene } from './scenes/GameOverScene.js';
 import { VictoryScene } from './scenes/VictoryScene.js';
-import { GAME_W, GAME_H } from './config/constants.js';
+import { GAME_W, CANVAS_H } from './config/constants.js';
 
 const config = {
   type: Phaser.AUTO,
   width: GAME_W,
-  height: GAME_H,
+  height: CANVAS_H,
   backgroundColor: '#111418',
   pixelArt: true,
   physics: {

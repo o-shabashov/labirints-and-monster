@@ -1,5 +1,5 @@
 import {
-  TILE, TILE_SIZE, GRID_W, GRID_H, VISION_RADIUS_TILES,
+  TILE, TILE_SIZE, GRID_W, GRID_H, GAME_W, GAME_H, TOPBAR_H, VISION_RADIUS_TILES,
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
   COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES, AMMO_PACK,
@@ -25,6 +25,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    // мир рендерится ПОД топ-баром, чтобы HUD не накрывал лабиринт
+    this.cameras.main.setViewport(0, TOPBAR_H, GAME_W, GAME_H);
     this.scene.launch('UIScene');
 
     this.gameState = { effects: [] };
