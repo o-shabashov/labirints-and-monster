@@ -269,6 +269,26 @@ export class GameScene extends Phaser.Scene {
 
     this.fog.update(this.player.sprite.x, this.player.sprite.y);
 
+    // dynamic entities (monsters, bullets, lure) видны только в текущем радиусе зрения,
+    // иначе их движение «просвечивает» через полупрозрачный dim explored-слой.
+    const visionPxSq = this.fog.currentRadiusPx * this.fog.currentRadiusPx;
+    const px = this.player.sprite.x, py = this.player.sprite.y;
+    const inSight = (sx, sy) => {
+      const ddx = sx - px, ddy = sy - py;
+      return ddx * ddx + ddy * ddy <= visionPxSq;
+    };
+    for (const m of this.monsters) {
+      if (!m.sprite.active) continue;
+      m.sprite.setVisible(inSight(m.sprite.x, m.sprite.y));
+    }
+    for (const b of this.bullets) {
+      if (b.dead || !b.sprite.active) continue;
+      b.sprite.setVisible(inSight(b.sprite.x, b.sprite.y));
+    }
+    if (this.lure && this.lure.sprite && this.lure.sprite.active) {
+      this.lure.sprite.setVisible(inSight(this.lure.x, this.lure.y));
+    }
+
     // HUD — единый emit с полным состоянием
     this.game.events.emit('hud:update', {
       hp: this.player.hp,

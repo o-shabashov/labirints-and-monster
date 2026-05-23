@@ -24,6 +24,7 @@ export class FogOfWar {
     const blind = this.scene.gameState ? hasEffect(this.scene.gameState, 'blindness') : false;
     const radiusTiles = blind ? Math.ceil(VISION_RADIUS_TILES * BLINDNESS_VISION_RATIO) : VISION_RADIUS_TILES;
     const radiusPx = radiusTiles * TILE_SIZE;
+    this.currentRadiusPx = radiusPx;
 
     // mark explored tiles within current vision
     const tx = Math.floor(playerX / TILE_SIZE);
