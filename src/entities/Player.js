@@ -12,10 +12,9 @@ export class Player {
   constructor(scene, x, y) {
     this.scene = scene;
     this.sprite = scene.physics.add.sprite(x, y, 'player');
-    // 0x72-спрайт ~16×28, scale 1.5 → display 24×42. Помещается в тайл по
-    // ширине с воздухом, по высоте чуть выше тайла — это «голова», torso
-    // визуально по центру клетки.
-    this.sprite.setScale(1.5);
+    // scale 1.0 → display 16×28. Игрок занимает ~половину 32px-коридора,
+    // ощущение «проход шире чем игрок».
+    this.sprite.setScale(1.0);
     this.sprite.setOrigin(0.5, 0.7);
     // компактный body-circle, чтобы свободно пролезать в коридорах
     const w = this.sprite.width, h = this.sprite.height;

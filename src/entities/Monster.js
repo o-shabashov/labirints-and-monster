@@ -4,7 +4,7 @@ export class Monster {
   constructor(scene, x, y, texture = 'monster') {
     this.scene = scene;
     this.sprite = scene.physics.add.sprite(x, y, texture);
-    this.sprite.setScale(1.5);
+    this.sprite.setScale(1.0);
     this.sprite.setOrigin(0.5, 0.7);
     const w = this.sprite.width, h = this.sprite.height;
     const r = 5;
