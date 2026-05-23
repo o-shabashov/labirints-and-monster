@@ -1,4 +1,8 @@
-import { PLAYER_SPEED, PLAYER_MAX_HP, FIRE_RATE_MS, STARTING_AMMO } from '../config/constants.js';
+import {
+  PLAYER_SPEED, PLAYER_MAX_HP, FIRE_RATE_MS, STARTING_AMMO,
+  STAMINA_MAX, STAMINA_SPRINT_PER_SEC, STAMINA_REGEN_PER_SEC,
+  SPRINT_MULTIPLIER, DASH_DISTANCE, DASH_DURATION_MS, DASH_COOLDOWN_MS,
+} from '../config/constants.js';
 import { applyKnockback, KNOCKBACK_DURATION, INVULNERABILITY_DURATION } from '../systems/Combat.js';
 
 export class Player {
@@ -12,6 +16,10 @@ export class Player {
     this.ammo = STARTING_AMMO;
     this.nextShotAt = 0;
     this.aim = null;
+    this.stamina = STAMINA_MAX;
+    this.dashUntil = 0;
+    this.dashCooldownUntil = 0;
+    this.dashDir = null;
   }
 
   setAim(aim) { this.aim = aim; }
@@ -51,8 +59,37 @@ export class Player {
   update(input) {
     const now = this.scene.time.now;
     if (now < this.knockbackUntil) return; // knockback ведёт игрока
-    const body = this.sprite.body;
-    body.setVelocity(input.move.x * PLAYER_SPEED, input.move.y * PLAYER_SPEED);
+
+    // dash в процессе → принудительная скорость, неуязвимость
+    if (now < this.dashUntil) {
+      const speed = DASH_DISTANCE / (DASH_DURATION_MS / 1000);
+      this.sprite.body.setVelocity(this.dashDir.x * speed, this.dashDir.y * speed);
+      return;
+    }
+
+    // активация dash
+    if (input.dash && now >= this.dashCooldownUntil) {
+      const dir = (input.move.x || input.move.y)
+        ? { x: input.move.x, y: input.move.y }
+        : (this.aim || { x: 1, y: 0 });
+      this.dashDir = dir;
+      this.dashUntil = now + DASH_DURATION_MS;
+      this.dashCooldownUntil = now + DASH_COOLDOWN_MS;
+      this.iframesUntil = Math.max(this.iframesUntil, this.dashUntil);
+      return;
+    }
+
+    // sprint
+    let speed = PLAYER_SPEED;
+    const dtSec = this.scene.game.loop.delta / 1000;
+    if (input.sprint && this.stamina > 0 && (input.move.x || input.move.y)) {
+      speed *= SPRINT_MULTIPLIER;
+      this.stamina = Math.max(0, this.stamina - STAMINA_SPRINT_PER_SEC * dtSec);
+    } else {
+      this.stamina = Math.min(STAMINA_MAX, this.stamina + STAMINA_REGEN_PER_SEC * dtSec);
+    }
+
+    this.sprite.body.setVelocity(input.move.x * speed, input.move.y * speed);
   }
 
   isDead() {

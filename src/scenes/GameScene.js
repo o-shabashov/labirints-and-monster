@@ -88,6 +88,7 @@ export class GameScene extends Phaser.Scene {
     const input = this.inputSys.read();
     this.player.setAim(input.aim);
     this.player.update(input);
+    this.game.events.emit('hud:update', { stamina: this.player.stamina });
 
     // стрельба
     if (input.shoot) {

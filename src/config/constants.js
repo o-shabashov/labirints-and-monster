@@ -46,3 +46,11 @@ export const BULLET_LIFETIME_MS = 800;
 export const FIRE_RATE_MS = 300;
 export const STARTING_AMMO = 12;
 export const MONSTER_HP_DEFAULT = 1;
+
+export const STAMINA_MAX = 100;
+export const STAMINA_SPRINT_PER_SEC = 40;
+export const STAMINA_REGEN_PER_SEC = 25;
+export const SPRINT_MULTIPLIER = 1.6;
+export const DASH_DISTANCE = 200;     // px
+export const DASH_DURATION_MS = 120;
+export const DASH_COOLDOWN_MS = 1500;

@@ -1,4 +1,4 @@
-import { PLAYER_MAX_HP, STARTING_AMMO } from '../config/constants.js';
+import { PLAYER_MAX_HP, STARTING_AMMO, STAMINA_MAX } from '../config/constants.js';
 
 export class UIScene extends Phaser.Scene {
   constructor() { super('UIScene'); }
@@ -9,8 +9,11 @@ export class UIScene extends Phaser.Scene {
     this.ammoText = this.add.text(12, 32, '', {
       fontFamily: 'monospace', fontSize: '18px', color: '#fff176',
     });
+    this.staminaBg = this.add.rectangle(12, 60, 120, 8, 0x222222).setOrigin(0, 0);
+    this.staminaBar = this.add.rectangle(12, 60, 120, 8, 0x4ec9ff).setOrigin(0, 0);
     this.onUpdate({ hp: PLAYER_MAX_HP });
     this.onUpdate({ ammo: STARTING_AMMO });
+    this.onUpdate({ stamina: STAMINA_MAX });
     this.game.events.on('hud:update', this.onUpdate, this);
     this.events.once('shutdown', () => {
       this.game.events.off('hud:update', this.onUpdate, this);
@@ -21,5 +24,6 @@ export class UIScene extends Phaser.Scene {
       this.hpText.setText('HP: ' + '♥'.repeat(state.hp) + '♡'.repeat(PLAYER_MAX_HP - state.hp));
     }
     if (state.ammo != null) this.ammoText.setText('● ' + state.ammo);
+    if (state.stamina != null) this.staminaBar.width = 120 * (state.stamina / 100);
   }
 }
