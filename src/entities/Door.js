@@ -2,30 +2,32 @@ import { TILE_SIZE, TILE } from '../config/constants.js';
 
 const TINT = { r: 0xff5252, g: 0x66bb6a, b: 0x42a5f5 };
 
-// Одна логическая дверь = один растянутый sprite поверх всех своих cells +
-// невидимый body на каждой cell для коллизии. Раньше каждая cell получала
-// собственную копию door PNG, что выглядело как «две двери рядом».
+// Тайл двери (32×32) ставится отдельным sprite на каждую клетку проёма.
+// Соседние тайлы зеркалятся (flipX/flipY), чтобы из двух одинаковых тайлов
+// получалась симметричная «двустворчатая» дверь, не растянутая по размеру.
+//
+// Для 2-клеточного horizontal-проёма — второй sprite flipX.
+// Для 2-клеточного vertical-проёма — второй sprite flipY.
+// Body — невидимая зона на каждой клетке.
 export class Door {
   constructor(scene, color, cells, map) {
     this.scene = scene;
     this.color = color;
     this.cells = cells;
     this.map = map;
-    const xs = cells.map(c => c.x);
-    const ys = cells.map(c => c.y);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
-    const wTiles = maxX - minX + 1;
-    const hTiles = maxY - minY + 1;
-    const cx = (minX + maxX + 1) / 2 * TILE_SIZE;
-    const cy = (minY + maxY + 1) / 2 * TILE_SIZE;
-    // Один sprite door_base тонко растянут на весь проём — 16×32 base, scale
-    // под актуальный размер в тайлах × 2 (т.к. 1 тайл = 2x асcет).
-    this.visual = scene.add.image(cx, cy, 'door_base');
-    this.visual.setScale(2 * wTiles, 2 * hTiles);
-    this.visual.setTint(TINT[color]);
-    // Колайдеры — невидимые зоны на каждой cell, чтобы дверь блокировала
-    // оба прохода даже когда визуально это «одно полотно».
+    // определяем ориентацию pair
+    const horizontal = cells.length >= 2 && cells[0].y === cells[1].y;
+    this.visuals = cells.map((c, i) => {
+      const wx = c.x * TILE_SIZE + TILE_SIZE / 2;
+      const wy = c.y * TILE_SIZE + TILE_SIZE / 2;
+      const img = scene.add.image(wx, wy, 'door_base');
+      img.setTint(TINT[color]);
+      if (i > 0) {
+        if (horizontal) img.setFlipX(true);
+        else img.setFlipY(true);
+      }
+      return img;
+    });
     this.bodies = cells.map(c => {
       const wx = c.x * TILE_SIZE + TILE_SIZE / 2;
       const wy = c.y * TILE_SIZE + TILE_SIZE / 2;
@@ -38,8 +40,9 @@ export class Door {
 
   open() {
     for (const c of this.cells) this.map.tiles[c.y][c.x] = TILE.FLOOR;
-    this.visual.destroy();
+    for (const v of this.visuals) v.destroy();
     for (const z of this.bodies) z.destroy();
+    this.visuals = [];
     this.bodies = [];
   }
 }
