@@ -75,6 +75,36 @@ export class BootScene extends Phaser.Scene {
       if (tex && tex.setFilter) tex.setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
 
+    // Огненный шар (snaряд игрока) — мягкий радиальный градиент с белым
+    // hot-center, оранжевой средней зоной и тёмно-красным краем. Размер
+    // 16×16, чтобы выглядел компактно на canvas.
+    const fbSize = 16;
+    const fbCv = document.createElement('canvas');
+    fbCv.width = fbCv.height = fbSize;
+    const fbx = fbCv.getContext('2d');
+    const fbg = fbx.createRadialGradient(fbSize/2, fbSize/2, 0, fbSize/2, fbSize/2, fbSize/2);
+    fbg.addColorStop(0.0, 'rgba(255,255,210,1)');
+    fbg.addColorStop(0.4, 'rgba(255,180,40,1)');
+    fbg.addColorStop(0.9, 'rgba(220,60,0,0.95)');
+    fbg.addColorStop(1.0, 'rgba(120,0,0,0)');
+    fbx.fillStyle = fbg;
+    fbx.fillRect(0, 0, fbSize, fbSize);
+    this.textures.addCanvas('fireball', fbCv);
+
+    // Орб врага — холодный фиолетовый шар, аналогичный gradient.
+    const eoSize = 16;
+    const eoCv = document.createElement('canvas');
+    eoCv.width = eoCv.height = eoSize;
+    const eox = eoCv.getContext('2d');
+    const eog = eox.createRadialGradient(eoSize/2, eoSize/2, 0, eoSize/2, eoSize/2, eoSize/2);
+    eog.addColorStop(0.0, 'rgba(255,240,255,1)');
+    eog.addColorStop(0.4, 'rgba(180,140,255,1)');
+    eog.addColorStop(0.9, 'rgba(100,40,200,0.95)');
+    eog.addColorStop(1.0, 'rgba(40,0,80,0)');
+    eox.fillStyle = eog;
+    eox.fillRect(0, 0, eoSize, eoSize);
+    this.textures.addCanvas('enemy_orb', eoCv);
+
     // Радиальный кольцевой brush для FogOfWar и (опционально) softCircle
     // accumulator для memory. Прозрачный в центре, peak alpha у границы,
     // снова прозрачный за пределами — сглаживает блочную границу зрения.

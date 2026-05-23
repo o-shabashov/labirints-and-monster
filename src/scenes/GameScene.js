@@ -434,12 +434,19 @@ export class GameScene extends Phaser.Scene {
   spawnEnemyProjectile(sx, sy, tx, ty, speed, lifetimeMs) {
     const dx = tx - sx, dy = ty - sy;
     const len = Math.hypot(dx, dy) || 1;
-    const sprite = this.physics.add.sprite(sx, sy, 'bullet');
-    sprite.setTint(0xb388ff);
-    sprite.setScale(1.5);
+    const sprite = this.physics.add.sprite(sx, sy, 'enemy_orb');
+    sprite.setScale(1.0);
     sprite.body.setAllowGravity(false);
-    sprite.body.setCircle(3, sprite.width / 2 - 3, sprite.height / 2 - 3);
+    sprite.body.setCircle(4, sprite.width / 2 - 4, sprite.height / 2 - 4);
     sprite.body.setVelocity((dx / len) * speed, (dy / len) * speed);
+    // фиолетовый шар тоже пульсирует
+    this.tweens.add({
+      targets: sprite,
+      scale: { from: 0.85, to: 1.1 },
+      duration: 250,
+      yoyo: true,
+      repeat: -1,
+    });
     const proj = { sprite, dead: false, dieAt: this.time.now + lifetimeMs };
     this.physics.add.collider(sprite, this.map.walls, () => {
       if (proj.dead) return;
