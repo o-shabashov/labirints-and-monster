@@ -1,16 +1,17 @@
-import { TILE_SIZE, VISION_RADIUS_TILES, BLINDNESS_VISION_RATIO } from '../config/constants.js';
+import { TILE_SIZE, GAME_W, GAME_H, VISION_RADIUS_TILES, BLINDNESS_VISION_RATIO } from '../config/constants.js';
 import { hasEffect } from '../systems/Effects.js';
 
-// Три слоя:
-//   depth 9  — dim per-tile: чёрный 0.78 alpha поверх explored клеток,
-//              которые сейчас вне vision-радиуса. Это «помню, но не вижу».
-//   depth 10 — fog per-tile: solid чёрный для всего unexplored.
-//   depth 11 — radial vignette image, центрированная на игроке — плавный
-//              ободок-перехода между vision и dim/fog.
+// Плавный fog через RenderTexture + soft_circle штампы.
 //
-// Эта реализация устойчива: не использует BitmapMask и RenderTexture'ы, не
-// зависит от текстурных фильтров — работает одинаково в pixelArt-режиме и
-// в antialias-режиме.
+//   fogRT — persistent чёрный 1.0 alpha слой, depth 10. Каждый кадр в позиции
+//           игрока штампуется erase('soft_circle') — стирания накапливаются
+//           и образуют «карту памяти» с плавными градиентными границами.
+//   dimRT — каждый кадр fill чёрный 0.78 alpha, затем erase в текущей позиции.
+//           Это «приглушение explored-памяти вне зрения»: видно где был, но
+//           тускло. Тоже плавный, никакой блочности.
+//
+// Сильное преимущество перед старой tile-based реализацией: границы
+// видимости абсолютно плавные, без «лесенки» по 32px-клеткам.
 export class FogOfWar {
   constructor(scene, gridW, gridH) {
     this.scene = scene;
@@ -18,15 +19,17 @@ export class FogOfWar {
     this.gridH = gridH;
     this.explored = Array.from({ length: gridH }, () => new Array(gridW).fill(false));
 
-    this.dim = scene.add.graphics();
-    this.dim.setDepth(9);
+    // explored-память: persistent, начинаем полностью закрытым
+    this.fogRT = scene.add.renderTexture(0, 0, GAME_W, GAME_H).setOrigin(0, 0).setDepth(10);
+    this.fogRT.fill(0x000000, 1);
 
-    this.fog = scene.add.graphics();
-    this.fog.setDepth(10);
+    // dim текущего vision — каждый кадр перерисовывается
+    this.dimRT = scene.add.renderTexture(0, 0, GAME_W, GAME_H).setOrigin(0, 0).setDepth(9);
 
-    this.vignette = scene.add.image(0, 0, 'vignette').setOrigin(0.5).setDepth(11);
     this.fullRadiusPx = VISION_RADIUS_TILES * TILE_SIZE;
     this.currentRadiusPx = this.fullRadiusPx;
+    // soft_circle 2× radius на сторону (см. BootScene)
+    this.brushHalf = this.fullRadiusPx;
   }
 
   update(playerX, playerY) {
@@ -38,8 +41,10 @@ export class FogOfWar {
     if (boosted) radiusTiles = VISION_RADIUS_TILES + 3;
     const radiusPx = radiusTiles * TILE_SIZE;
     this.currentRadiusPx = radiusPx;
+    const scale = radiusPx / this.fullRadiusPx;
+    const halfSized = this.brushHalf * scale;
 
-    // расширяем explored по текущему vision
+    // обновляем grid explored для статистики Victory
     const tx = Math.floor(playerX / TILE_SIZE);
     const ty = Math.floor(playerY / TILE_SIZE);
     const r = radiusTiles;
@@ -52,34 +57,17 @@ export class FogOfWar {
       }
     }
 
-    // explored клетки вне текущего vision — приглушаем
-    this.dim.clear();
-    this.dim.fillStyle(0x000000, 0.78);
-    const radiusPxSq = radiusPx * radiusPx;
-    for (let y = 0; y < this.gridH; y++) {
-      for (let x = 0; x < this.gridW; x++) {
-        if (!this.explored[y][x]) continue;
-        const cx = x * TILE_SIZE + TILE_SIZE / 2;
-        const cy = y * TILE_SIZE + TILE_SIZE / 2;
-        const ddx = cx - playerX, ddy = cy - playerY;
-        if (ddx * ddx + ddy * ddy > radiusPxSq) {
-          this.dim.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        }
-      }
-    }
-
-    // unexplored — solid black
-    this.fog.clear();
-    this.fog.fillStyle(0x000000, 1);
-    for (let y = 0; y < this.gridH; y++) {
-      for (let x = 0; x < this.gridW; x++) {
-        if (this.explored[y][x]) continue;
-        this.fog.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-      }
-    }
-
-    // vignette — feathering на границе текущего vision
-    this.vignette.setPosition(playerX, playerY);
-    this.vignette.setScale(radiusPx / this.fullRadiusPx);
+    // 1. Штампуем soft_circle на persistent fogRT — расширяем «карту памяти».
+    //    Создаём временный Image с нужным scale, рисуем erase'ом, уничтожаем.
+    const stamp = this.scene.add.image(playerX, playerY, 'soft_circle')
+      .setOrigin(0.5)
+      .setScale(scale)
+      .setVisible(false);
+    this.fogRT.erase(stamp);
+    // 2. dim — перезаливаем чёрным 0.78, затем стираем текущий vision полностью.
+    this.dimRT.clear();
+    this.dimRT.fill(0x000000, 0.78);
+    this.dimRT.erase(stamp);
+    stamp.destroy();
   }
 }
