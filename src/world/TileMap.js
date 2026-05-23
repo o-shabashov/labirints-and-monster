@@ -13,19 +13,15 @@ export class TileMap {
   render() {
     this.entrance = null;
     this.exit = null;
-    // ассеты 16×16, тайл — 32×32, поэтому setScale(2) везде
+    // Визуал — рисуем тайл-за-тайлом (стены/пол/вход/выход), потому что
+    // image должна быть NEAREST-pixel-art и не растягиваться.
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const px = x * TILE_SIZE + TILE_SIZE / 2;
         const py = y * TILE_SIZE + TILE_SIZE / 2;
         const t = this.tiles[y][x];
         if (t === TILE.WALL) {
-          const w = this.walls.create(px, py, 'wall');
-          w.setScale(2).refreshBody();
-          continue;
-        }
-        if (t === TILE.DOOR_R || t === TILE.DOOR_G || t === TILE.DOOR_B) {
-          this.scene.add.image(px, py, 'floor').setScale(2);
+          this.scene.add.image(px, py, 'wall').setScale(2);
           continue;
         }
         this.scene.add.image(px, py, 'floor').setScale(2);
@@ -36,6 +32,24 @@ export class TileMap {
           this.scene.add.image(px, py, 'exit').setScale(2);
           this.exit = { x, y };
         }
+      }
+    }
+    // Физика — мерджим стены в горизонтальные runs, чтобы вместо сетки из
+    // тысячи маленьких AABB получить десятки длинных. Игрок больше не цепляется
+    // за «уголки» между двумя смежными wall-тайлами.
+    for (let y = 0; y < this.height; y++) {
+      let x = 0;
+      while (x < this.width) {
+        if (this.tiles[y][x] !== TILE.WALL) { x++; continue; }
+        let endX = x;
+        while (endX + 1 < this.width && this.tiles[y][endX + 1] === TILE.WALL) endX++;
+        const len = endX - x + 1;
+        const cx = x * TILE_SIZE + (len * TILE_SIZE) / 2;
+        const cy = y * TILE_SIZE + TILE_SIZE / 2;
+        const zone = this.scene.add.zone(cx, cy, len * TILE_SIZE, TILE_SIZE);
+        this.scene.physics.add.existing(zone, true);
+        this.walls.add(zone);
+        x = endX + 1;
       }
     }
   }
