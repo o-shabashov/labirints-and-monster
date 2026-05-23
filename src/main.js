@@ -12,6 +12,11 @@ const config = {
   height: CANVAS_H,
   backgroundColor: '#111418',
   pixelArt: true,
+  // Используем собственный WebAudio из systems/Sound.js, ctx создаётся только
+  // после нажатия Space — без этой опции Phaser создаёт свой SoundManager
+  // прямо при new Phaser.Game(), и браузер кидает «AudioContext was not allowed
+  // to start» до первого взаимодействия.
+  audio: { noAudio: true },
   physics: {
     default: 'arcade',
     arcade: { debug: false },
