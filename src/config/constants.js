@@ -35,3 +35,8 @@ export const PLAYER_SPEED = 160;   // px/sec
 export const PLAYER_SIZE = 20;  // меньше тайла, чтобы пролезать в коридоры
 
 export const VISION_RADIUS_TILES = 5;
+
+export const PLAYER_MAX_HP = 3;
+export const KNOCKBACK_SPEED = 220;
+export const KNOCKBACK_MS = 200;
+export const IFRAMES_MS = 400;
