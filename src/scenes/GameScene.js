@@ -9,6 +9,7 @@ import { Wanderer } from '../entities/monsters/Wanderer.js';
 import { Guard } from '../entities/monsters/Guard.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
+import { Door } from '../entities/Door.js';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -21,7 +22,8 @@ export class GameScene extends Phaser.Scene {
     this.bullets = [];
 
     const seed = Date.now();
-    this.map = new TileMap(this, generateMaze(GRID_W, GRID_H, seed));
+    const { grid, keys: keySpec } = generateMaze(GRID_W, GRID_H, seed);
+    this.map = new TileMap(this, grid);
     const e = this.map.entrance;
     const spawn = this.map.tileToWorld(e.x, e.y);
     this.player = new Player(this, spawn.x, spawn.y);
@@ -89,6 +91,33 @@ export class GameScene extends Phaser.Scene {
       });
       this.pickups.push(p);
     }
+
+    // двери (по тайлам в map) и ключи (по keySpec)
+    this.doors = [];
+    for (const d of this.map.findDoors()) {
+      const door = new Door(this, d.x, d.y, d.tile, this.map);
+      this.physics.add.collider(this.player.sprite, door.sprite, () => {
+        if (this.player.hasKey(door.color)) {
+          door.open();
+          this.doors = this.doors.filter(x => x !== door);
+        }
+      });
+      this.doors.push(door);
+    }
+
+    this.keyPickups = [];
+    for (const k of keySpec) {
+      const w = this.map.tileToWorld(k.x, k.y);
+      const p = new Pickup(this, w.x, w.y, 'key_' + k.color);
+      this.physics.add.overlap(this.player.sprite, p.sprite, () => {
+        if (!p.sprite.active) return;
+        p.sprite.destroy();
+        this.player.addKey(k.color);
+        this.game.events.emit('hud:update', { keys: Array.from(this.player.keys) });
+      });
+      this.keyPickups.push(p);
+    }
+    this.game.events.emit('hud:update', { keys: [] });
   }
 
   update(_time, delta) {

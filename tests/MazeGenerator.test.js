@@ -4,13 +4,13 @@ import { generateMaze } from '../src/world/MazeGenerator.js';
 import { TILE } from '../src/config/constants.js';
 
 test('generateMaze: returns 2D grid of given size', () => {
-  const grid = generateMaze(31, 21, 42);
+  const { grid } = generateMaze(31, 21, 42);
   assert.equal(grid.length, 21);
   assert.equal(grid[0].length, 31);
 });
 
 test('generateMaze: borders are all walls', () => {
-  const grid = generateMaze(31, 21, 42);
+  const { grid } = generateMaze(31, 21, 42);
   for (let x = 0; x < 31; x++) {
     assert.equal(grid[0][x], TILE.WALL, `top row x=${x}`);
     assert.equal(grid[20][x], TILE.WALL, `bottom row x=${x}`);
@@ -22,7 +22,7 @@ test('generateMaze: borders are all walls', () => {
 });
 
 test('generateMaze: contains exactly one ENTRANCE and one EXIT', () => {
-  const grid = generateMaze(31, 21, 42);
+  const { grid } = generateMaze(31, 21, 42);
   let e = 0, x = 0;
   for (const row of grid) for (const t of row) {
     if (t === TILE.ENTRANCE) e++;
@@ -33,13 +33,13 @@ test('generateMaze: contains exactly one ENTRANCE and one EXIT', () => {
 });
 
 test('generateMaze: all floor cells are reachable from entrance', () => {
-  const grid = generateMaze(31, 21, 42);
+  const { grid } = generateMaze(31, 21, 42);
   // find entrance
   let sx = -1, sy = -1;
   for (let y = 0; y < grid.length; y++) for (let x = 0; x < grid[0].length; x++) {
     if (grid[y][x] === TILE.ENTRANCE) { sx = x; sy = y; }
   }
-  // BFS
+  // BFS — двери НЕ проходимы, но floor/entrance/exit — да
   const visited = Array.from({ length: grid.length }, () => new Array(grid[0].length).fill(false));
   const queue = [[sx, sy]];
   visited[sy][sx] = true;
@@ -56,7 +56,7 @@ test('generateMaze: all floor cells are reachable from entrance', () => {
       queue.push([nx, ny]);
     }
   }
-  // подсчёт всех non-wall клеток
+  // подсчёт всех non-wall клеток (включая двери)
   let nonWall = 0;
   for (const row of grid) for (const t of row) if (t !== TILE.WALL) nonWall++;
   assert.equal(reachable, nonWall, 'all non-wall cells must be reachable from entrance');

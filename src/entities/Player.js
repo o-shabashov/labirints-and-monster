@@ -20,7 +20,11 @@ export class Player {
     this.dashUntil = 0;
     this.dashCooldownUntil = 0;
     this.dashDir = null;
+    this.keys = new Set();   // 'r', 'g', 'b'
   }
+
+  addKey(color) { this.keys.add(color); }
+  hasKey(color) { return this.keys.has(color); }
 
   setAim(aim) { this.aim = aim; }
 
