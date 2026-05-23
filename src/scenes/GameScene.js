@@ -3,6 +3,9 @@ import {
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
   COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES, AMMO_PACK,
+  SPEED_BOOST_DURATION_MS, DAMAGE_BOOST_DURATION_MS, RAPID_FIRE_DURATION_MS,
+  VISION_BOOST_DURATION_MS, REGEN_DURATION_MS, REGEN_TICK_MS,
+  EXHAUSTED_DURATION_MS, WEAKNESS_DURATION_MS,
 } from '../config/constants.js';
 import { hasLineOfSight } from '../systems/Vision.js';
 import { getSound } from '../systems/Sound.js';
@@ -129,15 +132,25 @@ export class GameScene extends Phaser.Scene {
       });
       this.pickups.push(p);
     }
-    // 4 сундука
+    // 4 сундука с авто-открытием по overlap'у
     for (let i = 0; i < 4 && rooms.length; i++) {
       const idx = Math.floor(Math.random() * rooms.length);
       const c = rooms.splice(idx, 1)[0];
       const w = this.map.tileToWorld(c.x, c.y);
       const ch = new Chest(this, w.x, w.y);
+      this.physics.add.overlap(this.player.sprite, ch.sprite, () => this.handleChestOverlap(ch));
       this.chests.push(ch);
     }
     this.nearestChest = null;
+
+    // канал выбора из ChestScene
+    this.game.events.on('chest:choice', this._chestChoiceHandler = (type) => {
+      this.applyChestReward(type);
+      this.scene.resume();
+    });
+    this.events.once('shutdown', () => {
+      this.game.events.off('chest:choice', this._chestChoiceHandler);
+    });
 
     // компас — стрелка-точка на краю круга видимости
     this.compassArrow = this.add.graphics().setDepth(12);
@@ -208,15 +221,17 @@ export class GameScene extends Phaser.Scene {
         }
         const b = new Bullet(this, shot.ox, shot.oy, dx, dy, target);
         this.physics.add.collider(b.sprite, this.map.walls, () => b.kill());
+        const dmg = this.player.bulletDamage(this);
         for (const m of this.monsters) {
           if (!m.sprite.active) continue;
           this.physics.add.overlap(b.sprite, m.sprite, () => {
             if (b.dead || !m.sprite.active) return;
             b.kill();
             this.sound.hit();
-            if (m.takeDamage(1)) {
+            if (m.takeDamage(dmg)) {
               this.sound.monsterKilled();
               this.stats.monstersKilled++;
+              this.player.addWeaponXp();
               this.monsters = this.monsters.filter(x => x !== m);
             }
           });
@@ -244,29 +259,16 @@ export class GameScene extends Phaser.Scene {
     }
     this.enemyProjectiles = this.enemyProjectiles.filter(p => !p.dead);
 
-    // найти сундук в радиусе <1 тайла для подсказки и взаимодействия
-    this.nearestChest = null;
-    for (const ch of this.chests) {
-      if (ch.opened) continue;
-      const d = Math.hypot(ch.sprite.x - this.player.sprite.x, ch.sprite.y - this.player.sprite.y);
-      if (d < TILE_SIZE) { this.nearestChest = ch; break; }
-    }
-    if (input.interact) {
-      if (this.nearestChest) {
-        const reward = this.nearestChest.open();
-        this.applyChestReward(reward);
-        this.chests = this.chests.filter(c => !c.opened);
-        this.nearestChest = null;
-      } else if ((this.player.lureCharges || 0) > 0) {
-        this.throwLure();
-        this.sound.pickup();
-      }
+    // сундуки теперь открываются по overlap'у; E/X — только для приманки
+    if (input.interact && (this.player.lureCharges || 0) > 0) {
+      this.throwLure();
+      this.sound.pickup();
     }
 
     // эффекты во времени
     const pNow = performance.now();
     tickEffects(this.gameState, pNow);
-    // отравление: каждые POISON_TICK_MS — -1 HP, всего POISON_TICKS раз
+    // отравление
     const poison = this.gameState.effects.find(e => e.type === 'poison');
     if (poison && pNow >= (poison.nextTickAt || 0) && (poison.ticks || 0) < POISON_TICKS) {
       this.player.hp = Math.max(0, this.player.hp - 1);
@@ -278,6 +280,13 @@ export class GameScene extends Phaser.Scene {
         this.scene.start('GameOverScene', this.buildSummary());
         return;
       }
+    }
+    // регенерация
+    const regen = this.gameState.effects.find(e => e.type === 'regen');
+    if (regen && pNow >= (regen.nextTickAt || 0)) {
+      this.player.heal(1);
+      regen.nextTickAt = pNow + REGEN_TICK_MS;
+      this.sound.heal();
     }
 
     // armor regen
@@ -339,39 +348,71 @@ export class GameScene extends Phaser.Scene {
       ammo: this.player.ammo,
       stamina: this.player.stamina,
       armor: this.player.armor,
+      shield: this.player.shieldCharges || 0,
       effects: this.gameState.effects.map(e => ({ type: e.type, msLeft: e.expiresAt - pNow })),
-      interactHint: this.nearestChest ? 'E / X — открыть сундук' : '',
+      interactHint: '',
       device: this.inputSys.activeDevice,
       lureCharges: this.player.lureCharges || 0,
+      weaponLevel: this.player.weaponLevel,
+      weaponXp: this.player.weaponXp,
     });
   }
 
+  // вызвать выбранный из ChestScene баф или из лоу-вероятности сундука дебаф
   applyChestReward(type) {
     switch (type) {
-      case 'armor':    this.player.addArmor(2); break;
-      case 'heal':     this.player.heal(1); break;
-      case 'ammo':     this.player.ammo += AMMO_PACK; break;
-      case 'compass':  addEffect(this.gameState, 'compass', COMPASS_DURATION_MS); break;
-      case 'lure':     this.player.lureCharges = (this.player.lureCharges || 0) + 1; break;
-      case 'poison':   addEffect(this.gameState, 'poison', POISON_TICK_MS * POISON_TICKS, { nextTickAt: performance.now(), ticks: 0 }); break;
-      case 'slow':     addEffect(this.gameState, 'slow', SLOW_DURATION_MS); break;
-      case 'blindness':addEffect(this.gameState, 'blindness', BLINDNESS_DURATION_MS); break;
+      // мгновенные
+      case 'armor':           this.player.addArmor(2); break;
+      case 'heal':            this.player.heal(1); break;
+      case 'ammo':            this.player.ammo += AMMO_PACK; break;
+      case 'lure':            this.player.lureCharges = (this.player.lureCharges || 0) + 1; break;
+      case 'shield':          this.player.shieldCharges = (this.player.shieldCharges || 0) + 1; break;
+      case 'weapon_upgrade':  this.player.upgradeWeapon(); break;
+      // временные позитивные
+      case 'compass':         addEffect(this.gameState, 'compass', COMPASS_DURATION_MS); break;
+      case 'speed':           addEffect(this.gameState, 'speed', SPEED_BOOST_DURATION_MS); break;
+      case 'damage':          addEffect(this.gameState, 'damage', DAMAGE_BOOST_DURATION_MS); break;
+      case 'rapid_fire':      addEffect(this.gameState, 'rapid_fire', RAPID_FIRE_DURATION_MS); break;
+      case 'vision_boost':    addEffect(this.gameState, 'vision_boost', VISION_BOOST_DURATION_MS); break;
+      case 'regen':           addEffect(this.gameState, 'regen', REGEN_DURATION_MS, { nextTickAt: performance.now() + REGEN_TICK_MS }); break;
     }
-    const POWER_UPS = new Set(['armor', 'heal', 'ammo', 'compass', 'lure']);
-    if (POWER_UPS.has(type)) this.sound.chestPower();
-    else this.sound.chestDebuff();
     const labels = {
-      armor:     { text: 'Броня +2',     color: '#a3d977' },
-      heal:      { text: '+1 HP',        color: '#a3d977' },
-      ammo:      { text: '+6 патронов',  color: '#a3d977' },
-      compass:   { text: 'Компас',       color: '#a3d977' },
-      lure:      { text: 'Приманка +1',  color: '#a3d977' },
-      poison:    { text: 'Отравление!',  color: '#ff5252' },
-      slow:      { text: 'Замедление!',  color: '#ff5252' },
-      blindness: { text: 'Слепота!',     color: '#ff5252' },
+      armor: 'Броня +2', heal: '+1 HP', ammo: '+10 патронов', lure: 'Приманка +1',
+      shield: 'Щит +1', weapon_upgrade: 'Оружие +1 уровень',
+      compass: 'Компас', speed: 'Быстрота', damage: 'Сила атаки',
+      rapid_fire: 'Скорострел', vision_boost: 'Глаз филина', regen: 'Регенерация',
     };
-    const l = labels[type];
-    if (l) this.showToast(l.text, l.color);
+    if (labels[type]) this.showToast(labels[type], '#a3d977');
+  }
+
+  applyDebuff(type) {
+    switch (type) {
+      case 'poison':    addEffect(this.gameState, 'poison', POISON_TICK_MS * POISON_TICKS, { nextTickAt: performance.now(), ticks: 0 }); break;
+      case 'slow':      addEffect(this.gameState, 'slow', SLOW_DURATION_MS); break;
+      case 'blindness': addEffect(this.gameState, 'blindness', BLINDNESS_DURATION_MS); break;
+      case 'exhausted': addEffect(this.gameState, 'exhausted', EXHAUSTED_DURATION_MS); break;
+      case 'weakness':  addEffect(this.gameState, 'weakness', WEAKNESS_DURATION_MS); break;
+    }
+    const labels = {
+      poison: 'Отравление!', slow: 'Замедление!', blindness: 'Слепота!',
+      exhausted: 'Усталость!', weakness: 'Слабость!',
+    };
+    if (labels[type]) this.showToast(labels[type], '#ff5252');
+  }
+
+  handleChestOverlap(ch) {
+    if (ch.opened) return;
+    const result = ch.roll();
+    if (!result) return;
+    this.chests = this.chests.filter(x => x !== ch);
+    if (result.kind === 'debuff') {
+      this.sound.chestDebuff();
+      this.applyDebuff(result.type);
+    } else {
+      this.sound.chestPower();
+      this.scene.pause();
+      this.scene.launch('ChestScene', { options: result.options });
+    }
   }
 
   showToast(text, color = '#ffffff') {

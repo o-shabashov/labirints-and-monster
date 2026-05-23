@@ -27,6 +27,12 @@ export class UIScene extends Phaser.Scene {
     this.ammoText = this.add.text(260, 6, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#fff176',
     });
+    this.weaponText = this.add.text(420, 26, '', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#fff59d',
+    });
+    this.shieldText = this.add.text(220, 6, '', {
+      fontFamily: 'monospace', fontSize: '16px', color: '#9fa8da',
+    });
     this.keysText = this.add.text(340, 6, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#dddddd',
     });
@@ -90,6 +96,13 @@ export class UIScene extends Phaser.Scene {
     }
     if (state.device != null) {
       this.deviceIndicator.setText(state.device === 'gamepad' ? 'Gamepad' : 'Keyboard');
+    }
+    if (state.shield != null) {
+      this.shieldText.setText(state.shield > 0 ? '■'.repeat(state.shield) : '');
+    }
+    if (state.weaponLevel != null) {
+      const xp = state.weaponXp ?? 0;
+      this.weaponText.setText(`WPN lvl ${state.weaponLevel}  (${xp}/5)`);
     }
   }
 }

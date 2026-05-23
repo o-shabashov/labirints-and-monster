@@ -59,8 +59,12 @@ export class FogOfWar {
   }
 
   update(playerX, playerY) {
-    const blind = this.scene.gameState ? hasEffect(this.scene.gameState, 'blindness') : false;
-    const radiusTiles = blind ? Math.ceil(VISION_RADIUS_TILES * BLINDNESS_VISION_RATIO) : VISION_RADIUS_TILES;
+    const gs = this.scene.gameState;
+    const blind = gs ? hasEffect(gs, 'blindness') : false;
+    const boosted = gs ? hasEffect(gs, 'vision_boost') : false;
+    let radiusTiles = VISION_RADIUS_TILES;
+    if (blind) radiusTiles = Math.ceil(VISION_RADIUS_TILES * BLINDNESS_VISION_RATIO);
+    if (boosted) radiusTiles = VISION_RADIUS_TILES + 3;
     const radiusPx = radiusTiles * TILE_SIZE;
     this.currentRadiusPx = radiusPx;
     const scale = radiusPx / this.fullRadiusPx;

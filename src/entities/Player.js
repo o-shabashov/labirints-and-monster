@@ -3,6 +3,8 @@ import {
   STAMINA_MAX, STAMINA_SPRINT_PER_SEC, STAMINA_REGEN_PER_SEC,
   SPRINT_MULTIPLIER, DASH_DISTANCE, DASH_DURATION_MS, DASH_COOLDOWN_MS, DASH_STAMINA_COST,
   ARMOR_MAX, ARMOR_REGEN_DELAY_MS, SLOW_MULTIPLIER,
+  SPEED_BOOST_MULTIPLIER, RAPID_FIRE_FACTOR, DAMAGE_BOOST_BONUS,
+  WEAPON_XP_PER_LEVEL, WEAPON_MAX_LEVEL,
 } from '../config/constants.js';
 import { applyKnockback, KNOCKBACK_DURATION, INVULNERABILITY_DURATION } from '../systems/Combat.js';
 import { hasEffect } from '../systems/Effects.js';
@@ -34,6 +36,31 @@ export class Player {
     this.armor = 0;
     this.lastDamageAt = 0;
     this.lureCharges = 0;
+    this.shieldCharges = 0;
+    this.weaponLevel = 1;
+    this.weaponXp = 0;
+  }
+
+  upgradeWeapon() {
+    this.weaponLevel = Math.min(WEAPON_MAX_LEVEL, this.weaponLevel + 1);
+    this.weaponXp = 0;
+  }
+
+  addWeaponXp(n = 1) {
+    if (this.weaponLevel >= WEAPON_MAX_LEVEL) return;
+    this.weaponXp += n;
+    if (this.weaponXp >= WEAPON_XP_PER_LEVEL) {
+      this.weaponXp -= WEAPON_XP_PER_LEVEL;
+      this.weaponLevel++;
+    }
+  }
+
+  // итоговый урон пули — уровень оружия + бонус damage, минус slbость
+  bulletDamage(scene) {
+    let d = this.weaponLevel;
+    if (scene.gameState && hasEffect(scene.gameState, 'damage')) d += DAMAGE_BOOST_BONUS;
+    if (scene.gameState && hasEffect(scene.gameState, 'weakness')) d = Math.max(1, d - 1);
+    return d;
   }
 
   addKey(color) { this.keys.add(color); }
@@ -46,14 +73,17 @@ export class Player {
     if (this.ammo <= 0) return null;
     if (now < this.nextShotAt) return null;
     this.ammo -= 1;
-    this.nextShotAt = now + FIRE_RATE_MS;
+    const factor = (this.scene.gameState && hasEffect(this.scene.gameState, 'rapid_fire')) ? RAPID_FIRE_FACTOR : 1;
+    this.nextShotAt = now + FIRE_RATE_MS * factor;
     return { x: this.aim.x, y: this.aim.y, ox: this.sprite.x, oy: this.sprite.y };
   }
 
   takeHit(fromX, fromY) {
     const now = this.scene.time.now;
     if (now < this.iframesUntil) return false;
-    if (this.armor > 0) {
+    if (this.shieldCharges > 0) {
+      this.shieldCharges -= 1;
+    } else if (this.armor > 0) {
       this.armor -= 1;
     } else {
       this.hp -= 1;
@@ -116,18 +146,22 @@ export class Player {
       return;
     }
 
-    // sprint
+    // sprint и эффекты скорости
     let speed = PLAYER_SPEED;
     const dtSec = this.scene.game.loop.delta / 1000;
+    const exhausted = this.scene.gameState && hasEffect(this.scene.gameState, 'exhausted');
     if (input.sprint && this.stamina > 0 && (input.move.x || input.move.y)) {
       speed *= SPRINT_MULTIPLIER;
       this.stamina = Math.max(0, this.stamina - STAMINA_SPRINT_PER_SEC * dtSec);
-    } else {
+    } else if (!exhausted) {
       this.stamina = Math.min(STAMINA_MAX, this.stamina + STAMINA_REGEN_PER_SEC * dtSec);
     }
 
     if (this.scene.gameState && hasEffect(this.scene.gameState, 'slow')) {
       speed *= SLOW_MULTIPLIER;
+    }
+    if (this.scene.gameState && hasEffect(this.scene.gameState, 'speed')) {
+      speed *= SPEED_BOOST_MULTIPLIER;
     }
 
     const vx = input.move.x * speed;

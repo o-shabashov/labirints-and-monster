@@ -2,6 +2,7 @@ import { BootScene } from './scenes/BootScene.js';
 import { MenuScene } from './scenes/MenuScene.js';
 import { GameScene } from './scenes/GameScene.js';
 import { UIScene } from './scenes/UIScene.js';
+import { ChestScene } from './scenes/ChestScene.js';
 import { GameOverScene } from './scenes/GameOverScene.js';
 import { VictoryScene } from './scenes/VictoryScene.js';
 import { GAME_W, CANVAS_H } from './config/constants.js';
@@ -26,7 +27,7 @@ const config = {
     default: 'arcade',
     arcade: { debug: false },
   },
-  scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene, VictoryScene],
+  scene: [BootScene, MenuScene, GameScene, UIScene, ChestScene, GameOverScene, VictoryScene],
 };
 
 import { getSound } from './systems/Sound.js';
