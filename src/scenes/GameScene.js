@@ -5,6 +5,8 @@ import { generateMaze } from '../world/MazeGenerator.js';
 import { FogOfWar } from '../world/FogOfWar.js';
 import { Input } from '../systems/Input.js';
 import { Chaser } from '../entities/monsters/Chaser.js';
+import { Wanderer } from '../entities/monsters/Wanderer.js';
+import { Guard } from '../entities/monsters/Guard.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
 
@@ -46,12 +48,18 @@ export class GameScene extends Phaser.Scene {
           if (Math.hypot(dx, dy) >= minDistTiles) candidates.push({ x, y });
         }
       }
-      // 3 монстра-преследователя на этом этапе
-      for (let i = 0; i < 3 && candidates.length; i++) {
+      // распределение: 4 wanderer, 2 chaser, 1 guard (если есть слоты)
+      const plan = [
+        ...Array(4).fill(Wanderer),
+        ...Array(2).fill(Chaser),
+        ...Array(1).fill(Guard),
+      ];
+      for (const Cls of plan) {
+        if (candidates.length === 0) break;
         const idx = Math.floor(Math.random() * candidates.length);
         const c = candidates.splice(idx, 1)[0];
         const w = this.map.tileToWorld(c.x, c.y);
-        const m = new Chaser(this, w.x, w.y);
+        const m = new Cls(this, w.x, w.y);
         this.physics.add.collider(m.sprite, this.map.walls);
         this.physics.add.overlap(this.player.sprite, m.sprite, () => {
           const took = this.player.takeHit(m.sprite.x, m.sprite.y);

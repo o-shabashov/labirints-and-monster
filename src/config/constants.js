@@ -54,3 +54,7 @@ export const SPRINT_MULTIPLIER = 1.6;
 export const DASH_DISTANCE = 200;     // px
 export const DASH_DURATION_MS = 120;
 export const DASH_COOLDOWN_MS = 1500;
+
+export const WANDERER_VISION_TILES = 4;
+export const WANDERER_LOSE_INTEREST_MS = 3000;
+export const GUARD_PATROL_HALF = 1;  // охраняет 3×3 => half=1

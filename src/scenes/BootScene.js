@@ -61,6 +61,22 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(COLOR.BULLET, 1);
     g.fillCircle(4, 4, 4);
     g.generateTexture('bullet', 8, 8);
+    g.clear();
+
+    // wanderer (orange)
+    g.fillStyle(0xff9800, 1);
+    g.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
+    g.lineStyle(2, 0x000000, 1);
+    g.strokeRect(1, 1, PLAYER_SIZE - 2, PLAYER_SIZE - 2);
+    g.generateTexture('monster_wanderer', PLAYER_SIZE, PLAYER_SIZE);
+    g.clear();
+
+    // guard (purple)
+    g.fillStyle(0x9c27b0, 1);
+    g.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
+    g.lineStyle(2, 0x000000, 1);
+    g.strokeRect(1, 1, PLAYER_SIZE - 2, PLAYER_SIZE - 2);
+    g.generateTexture('monster_guard', PLAYER_SIZE, PLAYER_SIZE);
     g.destroy();
 
     this.scene.start('GameScene');
