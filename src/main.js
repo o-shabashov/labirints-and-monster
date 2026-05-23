@@ -19,9 +19,6 @@ const config = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: GAME_W,
     height: CANVAS_H,
-    // на retina backing store больше — текст и края градиента не размываются
-    // при последующем CSS-fit'е.
-    zoom: window.devicePixelRatio || 1,
   },
   physics: {
     default: 'arcade',

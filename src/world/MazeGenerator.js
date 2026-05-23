@@ -215,31 +215,35 @@ function placeEntranceExitDoors(grid, width, height, passages, seed) {
   }
   grid[bestY][bestX] = TILE.EXIT;
 
-  // двери — только на passages, которые остались узкими (не съедены комнатой)
+  // двери — на passages, лежащих на пути. Сначала пробуем «узкие» (бутылочные
+  // горла, где обоих боков остались стены — комнаты не съели). Если их мало —
+  // расширяем пул до любых passages на пути.
   const path = findPath(grid, sx, sy, bestX, bestY);
   const onPath = new Set(path.map(p => p.y * width + p.x));
-  const narrowPassages = (passages || []).filter(p =>
-    p.cells.every(c => {
-      // оба соседних cell по перпендикулярной оси должны оставаться WALL —
-      // иначе это уже не bottleneck, а вход в комнату.
-      const horizontalGap = grid[c.y][c.x - 1] === TILE.WALL && grid[c.y][c.x + 1] === TILE.WALL;
-      const verticalGap   = grid[c.y - 1] && grid[c.y - 1][c.x] === TILE.WALL && grid[c.y + 1] && grid[c.y + 1][c.x] === TILE.WALL;
-      return horizontalGap || verticalGap;
-    }) && p.cells.some(c => onPath.has(c.y * width + c.x))
+  const onPathPassages = (passages || []).filter(p =>
+    p.cells.some(c => onPath.has(c.y * width + c.x))
   );
+  const isNarrow = (p) => p.cells.every(c => {
+    const horizontalGap = grid[c.y][c.x - 1] === TILE.WALL && grid[c.y][c.x + 1] === TILE.WALL;
+    const verticalGap   = grid[c.y - 1] && grid[c.y - 1][c.x] === TILE.WALL && grid[c.y + 1] && grid[c.y + 1][c.x] === TILE.WALL;
+    return horizontalGap || verticalGap;
+  });
+  const narrowPassages = onPathPassages.filter(isNarrow);
+  // если узких нет (всё съели комнаты) — fall back на любые passages на пути
+  const doorPool = narrowPassages.length >= 1 ? narrowPassages : onPathPassages;
 
   const doorColors = [TILE.DOOR_R, TILE.DOOR_G, TILE.DOOR_B];
   const keyColors = ['r', 'g', 'b'];
   const keys = [], doors = [];
   const rand = mulberry(seed ^ 0xABCDEF);
-  const doorsToPlace = narrowPassages.length > 0
-    ? Math.min(narrowPassages.length, 1 + Math.floor(rand() * 3))
+  const doorsToPlace = doorPool.length > 0
+    ? Math.min(doorPool.length, 1 + Math.floor(rand() * 3))
     : 0;
   const used = new Set();
   for (let i = 0; i < doorsToPlace; i++) {
     let pick;
     for (let t = 0; t < 30; t++) {
-      pick = narrowPassages[Math.floor(rand() * narrowPassages.length)];
+      pick = doorPool[Math.floor(rand() * doorPool.length)];
       const key = pick.cells[0].y * width + pick.cells[0].x;
       if (!used.has(key)) { used.add(key); break; }
     }
