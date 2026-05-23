@@ -1,27 +1,7 @@
 import { TILE, TILE_SIZE, GRID_W, GRID_H } from '../config/constants.js';
 import { TileMap } from '../world/TileMap.js';
 import { Player } from '../entities/Player.js';
-
-function makeFixedMaze() {
-  // простая рамка + несколько перегородок
-  const t = [];
-  for (let y = 0; y < GRID_H; y++) {
-    const row = [];
-    for (let x = 0; x < GRID_W; x++) {
-      const isBorder = x === 0 || y === 0 || x === GRID_W - 1 || y === GRID_H - 1;
-      row.push(isBorder ? TILE.WALL : TILE.FLOOR);
-    }
-    t.push(row);
-  }
-  // две вертикальные перегородки с проёмами
-  for (let y = 1; y < GRID_H - 1; y++) {
-    if (y !== 5) t[y][10] = TILE.WALL;
-    if (y !== 15) t[y][20] = TILE.WALL;
-  }
-  t[2][2] = TILE.ENTRANCE;
-  t[18][28] = TILE.EXIT;
-  return t;
-}
+import { generateMaze } from '../world/MazeGenerator.js';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -29,7 +9,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.map = new TileMap(this, makeFixedMaze());
+    const seed = Date.now();
+    this.map = new TileMap(this, generateMaze(GRID_W, GRID_H, seed));
     const e = this.map.entrance;
     const spawn = this.map.tileToWorld(e.x, e.y);
     this.player = new Player(this, spawn.x, spawn.y);
