@@ -3,6 +3,7 @@ import { TileMap } from '../world/TileMap.js';
 import { Player } from '../entities/Player.js';
 import { generateMaze } from '../world/MazeGenerator.js';
 import { FogOfWar } from '../world/FogOfWar.js';
+import { Input } from '../systems/Input.js';
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -24,24 +25,16 @@ export class GameScene extends Phaser.Scene {
       this.scene.start('VictoryScene');
     });
 
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT');
+    this.inputSys = new Input(this);
 
     this.fog = new FogOfWar(this, GRID_W, GRID_H);
     this.player.sprite.setDepth(5);  // под маской, но над полом
   }
 
   update() {
-    // временный inline-ввод, заменим в Task 5
-    const k = this.keys;
-    const move = { x: 0, y: 0 };
-    if (k.A.isDown || k.LEFT.isDown) move.x = -1;
-    else if (k.D.isDown || k.RIGHT.isDown) move.x = 1;
-    if (k.W.isDown || k.UP.isDown) move.y = -1;
-    else if (k.S.isDown || k.DOWN.isDown) move.y = 1;
-    const len = Math.hypot(move.x, move.y);
-    if (len > 0) { move.x /= len; move.y /= len; }
-
-    this.player.update({ move });
+    this.inputSys.setAimOrigin(this.player.sprite.x, this.player.sprite.y);
+    const input = this.inputSys.read();
+    this.player.update(input);
     this.fog.update(this.player.sprite.x, this.player.sprite.y);
   }
 }
