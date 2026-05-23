@@ -18,6 +18,8 @@ function makeFixedMaze() {
     if (y !== 5) t[y][10] = TILE.WALL;
     if (y !== 15) t[y][20] = TILE.WALL;
   }
+  t[2][2] = TILE.ENTRANCE;
+  t[18][28] = TILE.EXIT;
   return t;
 }
 
@@ -28,9 +30,17 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.map = new TileMap(this, makeFixedMaze());
-    const spawn = this.map.tileToWorld(2, 2);
+    const e = this.map.entrance;
+    const spawn = this.map.tileToWorld(e.x, e.y);
     this.player = new Player(this, spawn.x, spawn.y);
     this.physics.add.collider(this.player.sprite, this.map.walls);
+
+    const exitPos = this.map.tileToWorld(this.map.exit.x, this.map.exit.y);
+    this.exitZone = this.add.zone(exitPos.x, exitPos.y, TILE_SIZE, TILE_SIZE);
+    this.physics.add.existing(this.exitZone, true);
+    this.physics.add.overlap(this.player.sprite, this.exitZone, () => {
+      this.scene.start('VictoryScene');
+    });
 
     this.keys = this.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT');
   }

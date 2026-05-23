@@ -21,6 +21,20 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('floor', TILE_SIZE, TILE_SIZE);
     g.clear();
 
+    // entrance
+    g.fillStyle(COLOR.ENTRANCE, 1);
+    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    g.generateTexture('entrance', TILE_SIZE, TILE_SIZE);
+    g.clear();
+
+    // exit
+    g.fillStyle(COLOR.EXIT, 1);
+    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    g.lineStyle(3, 0x000000, 1);
+    g.strokeRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    g.generateTexture('exit', TILE_SIZE, TILE_SIZE);
+    g.clear();
+
     // player
     g.fillStyle(COLOR.PLAYER, 1);
     g.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);

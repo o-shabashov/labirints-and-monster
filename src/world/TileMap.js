@@ -11,6 +11,8 @@ export class TileMap {
   }
 
   render() {
+    this.entrance = null;
+    this.exit = null;
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const px = x * TILE_SIZE + TILE_SIZE / 2;
@@ -18,8 +20,15 @@ export class TileMap {
         const t = this.tiles[y][x];
         if (t === TILE.WALL) {
           this.walls.create(px, py, 'wall').refreshBody();
-        } else {
-          this.scene.add.image(px, py, 'floor');
+          continue;
+        }
+        this.scene.add.image(px, py, 'floor');
+        if (t === TILE.ENTRANCE) {
+          this.scene.add.image(px, py, 'entrance');
+          this.entrance = { x, y };
+        } else if (t === TILE.EXIT) {
+          this.scene.add.image(px, py, 'exit');
+          this.exit = { x, y };
         }
       }
     }

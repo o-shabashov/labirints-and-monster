@@ -1,5 +1,6 @@
 import { BootScene } from './scenes/BootScene.js';
 import { GameScene } from './scenes/GameScene.js';
+import { VictoryScene } from './scenes/VictoryScene.js';
 import { GAME_W, GAME_H } from './config/constants.js';
 
 const config = {
@@ -12,7 +13,7 @@ const config = {
     default: 'arcade',
     arcade: { debug: false },
   },
-  scene: [BootScene, GameScene],
+  scene: [BootScene, GameScene, VictoryScene],
 };
 
 new Phaser.Game(config);
