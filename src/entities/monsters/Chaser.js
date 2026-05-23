@@ -8,7 +8,7 @@ export class Chaser extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y);
     this.speed = PLAYER_SPEED * 0.55;
-    this.hp = 2;
+    this.hp = 1;
   }
 
   update(dtMs, player, map) {

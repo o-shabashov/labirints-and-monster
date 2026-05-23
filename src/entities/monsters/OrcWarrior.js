@@ -10,7 +10,7 @@ export class OrcWarrior extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_orc');
     this.speed = PLAYER_SPEED * 0.5;
-    this.hp = 4;
+    this.hp = 2;
   }
   update(dtMs, player, map) {
     this.repathTimer -= dtMs;

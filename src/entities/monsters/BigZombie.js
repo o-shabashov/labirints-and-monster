@@ -11,7 +11,7 @@ export class BigZombie extends Monster {
     super(scene, x, y, 'monster_bigzombie');
     this.sprite.setScale(1.2);
     this.speed = PLAYER_SPEED * 0.3;
-    this.hp = 6;
+    this.hp = 4;
   }
   update(dtMs, player, map) {
     this.repathTimer -= dtMs;

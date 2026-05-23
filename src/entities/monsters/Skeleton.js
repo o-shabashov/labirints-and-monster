@@ -10,7 +10,7 @@ export class Skeleton extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_skeleton');
     this.speed = PLAYER_SPEED * 0.4;
-    this.hp = 3;
+    this.hp = 2;
   }
   update(dtMs, player, map) {
     this.repathTimer -= dtMs;

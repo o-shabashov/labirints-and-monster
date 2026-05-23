@@ -93,3 +93,9 @@ export const SHIELD_MAX_CHARGES         = 3;       // shield-зерна, по 1 
 export const WEAPON_XP_PER_KILL         = 1;
 export const WEAPON_XP_PER_LEVEL        = 5;
 export const WEAPON_MAX_LEVEL           = 5;
+// Монстры со временем становятся жирнее и шустрее. Tier ↑ каждые
+// MOB_TIER_PERIOD_MS. На tier'е N: HP × (1 + (N-1)*0.5), speed × (1 + (N-1)*0.1).
+export const MOB_TIER_PERIOD_MS         = 75000;
+export const MOB_TIER_MAX               = 8;
+export const MOB_TIER_HP_BONUS_PER      = 0.5;
+export const MOB_TIER_SPEED_BONUS_PER   = 0.1;

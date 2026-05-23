@@ -6,6 +6,9 @@ import {
   SPEED_BOOST_DURATION_MS, DAMAGE_BOOST_DURATION_MS, RAPID_FIRE_DURATION_MS,
   VISION_BOOST_DURATION_MS, REGEN_DURATION_MS, REGEN_TICK_MS,
   EXHAUSTED_DURATION_MS, WEAKNESS_DURATION_MS,
+  FIRE_RATE_MS, FIRE_RATE_PER_LEVEL,
+  MOB_TIER_PERIOD_MS, MOB_TIER_MAX,
+  MOB_TIER_HP_BONUS_PER, MOB_TIER_SPEED_BONUS_PER,
 } from '../config/constants.js';
 import { hasLineOfSight } from '../systems/Vision.js';
 import { getSound } from '../systems/Sound.js';
@@ -86,18 +89,19 @@ export class GameScene extends Phaser.Scene {
           if (Math.hypot(dx, dy) >= minDistTiles) candidates.push({ x, y });
         }
       }
-      // Зоопарк: смесь всех 10 типов, около ~30 монстров на старте.
+      // Зоопарк: смесь всех 10 типов, ~25 монстров на старте (на треть меньше
+      // прежних 37 — тестирование показало что было перебор).
       const plan = [
-        ...Array(8).fill(Wanderer),
-        ...Array(5).fill(Chaser),
-        ...Array(3).fill(Guard),
-        ...Array(3).fill(Shooter),
-        ...Array(3).fill(Skeleton),
+        ...Array(5).fill(Wanderer),
+        ...Array(3).fill(Chaser),
+        ...Array(2).fill(Guard),
+        ...Array(2).fill(Shooter),
+        ...Array(2).fill(Skeleton),
         ...Array(2).fill(BigZombie),
-        ...Array(4).fill(Goblin),
+        ...Array(3).fill(Goblin),
         ...Array(2).fill(OrcWarrior),
-        ...Array(4).fill(TinyZombie),
-        ...Array(3).fill(MaskedOrc),
+        ...Array(2).fill(TinyZombie),
+        ...Array(2).fill(MaskedOrc),
       ];
       for (const Cls of plan) {
         if (candidates.length === 0) break;
@@ -110,7 +114,7 @@ export class GameScene extends Phaser.Scene {
     // респаун-таймеры (волны чаще и злее)
     this.nextRespawnAt = this.time.now + 8000;
     this.nextWaveAt    = this.time.now + 18000;
-    this.MAX_MONSTERS  = 80;  // cap чтобы не разнести FPS
+    this.MAX_MONSTERS  = 55;  // на треть меньше — соответствует уменьшенному ростеру
 
     this.fog = new FogOfWar(this, GRID_W, GRID_H);
     this.player.sprite.setDepth(5);  // под маской, но над полом
@@ -164,6 +168,17 @@ export class GameScene extends Phaser.Scene {
 
     // индикатор направления игрока — белая точка на «макушке» спрайта
     this.playerDir = this.add.graphics().setDepth(6);
+
+    // ореол вокруг игрока — синий мягкий halo, пульсирует. Помогает видеть
+    // героя в толпе монстров. Рендерится ПОД игроком (depth 4 vs player 5).
+    this.playerHalo = this.add.graphics().setDepth(4);
+    this.tweens.add({
+      targets: this.playerHalo,
+      alpha: { from: 0.45, to: 0.85 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+    });
 
     // двери — одна логическая дверь = один sprite поверх проёма + body на каждом тайле
     this.doors = [];
@@ -327,11 +342,24 @@ export class GameScene extends Phaser.Scene {
       this.compassArrow.fillCircle(px, py, 5);
     }
 
+    // ореол под игроком — три кольца с убыванием прозрачности, читается даже
+    // когда сверху бегают 5–10 монстров.
+    this.playerHalo.clear();
+    {
+      const px = this.player.sprite.x, py = this.player.sprite.y + 4;
+      this.playerHalo.fillStyle(0x4ec9ff, 0.15);
+      this.playerHalo.fillCircle(px, py, 26);
+      this.playerHalo.fillStyle(0x4ec9ff, 0.25);
+      this.playerHalo.fillCircle(px, py, 18);
+      this.playerHalo.fillStyle(0x4ec9ff, 0.35);
+      this.playerHalo.fillCircle(px, py, 12);
+    }
+
     // индикатор направления — точка на краю спрайта в сторону lastMoveDir
     this.playerDir.clear();
     const dir = this.lastMoveDir;
     if (dir) {
-      const off = 9;  // радиус смещения от центра, ~край sprite 20×20
+      const off = 9;
       this.playerDir.fillStyle(0xffffff, 1);
       this.playerDir.fillCircle(
         this.player.sprite.x + dir.x * off,
@@ -362,7 +390,10 @@ export class GameScene extends Phaser.Scene {
       this.lure.sprite.setVisible(inSight(this.lure.x, this.lure.y));
     }
 
-    // HUD — единый emit с полным состоянием
+    // HUD — единый emit с полным состоянием. Включаем расчётный урон пули,
+    // фактический интервал стрельбы и tier монстров с прогрессом до следующего.
+    const dmg = this.player.bulletDamage(this);
+    const fireMs = Math.round(FIRE_RATE_MS * (1 - FIRE_RATE_PER_LEVEL * (this.player.weaponLevel - 1)));
     this.game.events.emit('hud:update', {
       hp: this.player.hp,
       stamina: this.player.stamina,
@@ -374,6 +405,10 @@ export class GameScene extends Phaser.Scene {
       lureCharges: this.player.lureCharges || 0,
       weaponLevel: this.player.weaponLevel,
       weaponXp: this.player.weaponXp,
+      weaponDamage: dmg,
+      weaponRateMs: fireMs,
+      mobTier: this.mobTier(),
+      mobTierFraction: this.mobTierFraction(),
     });
   }
 
@@ -490,10 +525,32 @@ export class GameScene extends Phaser.Scene {
 
   // Универсальный спавн монстра — initial и для волн/респаунов. Привязывает
   // обычные коллайдеры и overlap c игроком (с takeHit и GameOver-on-death).
+  // Текущий tier монстров: 1 на старте, +1 каждые MOB_TIER_PERIOD_MS, cap MAX.
+  mobTier() {
+    const elapsedMs = this.time.now - (this.stats?.startedAt ?? this.time.now);
+    return Math.min(MOB_TIER_MAX, 1 + Math.floor(elapsedMs / MOB_TIER_PERIOD_MS));
+  }
+  mobTierFraction() {
+    const elapsedMs = this.time.now - (this.stats?.startedAt ?? this.time.now);
+    const inTier = elapsedMs % MOB_TIER_PERIOD_MS;
+    return Math.min(1, inTier / MOB_TIER_PERIOD_MS);
+  }
+
   spawnMonster(Cls, wx, wy) {
     const m = new Cls(this, wx, wy);
+    // прокачка под текущий tier — жирнее и шустрее
+    const tier = this.mobTier();
+    if (tier > 1) {
+      const hpMult = 1 + (tier - 1) * MOB_TIER_HP_BONUS_PER;
+      const spdMult = 1 + (tier - 1) * MOB_TIER_SPEED_BONUS_PER;
+      m.hp = Math.max(1, Math.round(m.hp * hpMult));
+      m.speed *= spdMult;
+    }
     this.physics.add.collider(m.sprite, this.map.walls);
-    this.physics.add.overlap(this.player.sprite, m.sprite, () => {
+    // Player ↔ monster — collider (физический блок), не overlap. Игрок
+    // упирается в моба, не проходит сквозь. Между monstr'ами collider'а нет —
+    // они проходят друг через друга, не образуют пробок.
+    this.physics.add.collider(this.player.sprite, m.sprite, () => {
       const took = this.player.takeHit(m.sprite.x, m.sprite.y);
       if (took) {
         this.sound.playerHurt();
@@ -553,11 +610,11 @@ export class GameScene extends Phaser.Scene {
     const r = Math.random();
     let label, count, fixed;
     if (r < 0.4) {
-      label = '🩸 Орда!'; count = 14 + Math.floor(Math.random() * 8); fixed = Wanderer;
+      label = '🩸 Орда!'; count = 9 + Math.floor(Math.random() * 6); fixed = Wanderer;
     } else if (r < 0.7) {
-      label = '⚡ Спринт!'; count = 8 + Math.floor(Math.random() * 4); fixed = Chaser;
+      label = '⚡ Спринт!'; count = 5 + Math.floor(Math.random() * 3); fixed = Chaser;
     } else {
-      label = '☠ Засада!'; count = 12 + Math.floor(Math.random() * 6); fixed = null;
+      label = '☠ Засада!'; count = 8 + Math.floor(Math.random() * 4); fixed = null;
     }
     for (let i = 0; i < count; i++) this.spawnRandomMonster(fixed);
     this.showToast(label, '#ff5252');
@@ -566,7 +623,7 @@ export class GameScene extends Phaser.Scene {
   tickSpawns() {
     const now = this.time.now;
     if (now >= this.nextRespawnAt) {
-      const burst = 2 + (Math.random() < 0.5 ? 1 : 0);  // 2–3 за тик
+      const burst = 1 + (Math.random() < 0.4 ? 1 : 0);  // 1–2 за тик
       for (let i = 0; i < burst; i++) this.spawnRandomMonster();
       const elapsedSec = (now - this.stats.startedAt) / 1000;
       const interval = Math.max(3500, 8000 - elapsedSec * 60);

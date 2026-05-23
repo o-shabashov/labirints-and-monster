@@ -11,7 +11,7 @@ export class MaskedOrc extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_masked');
     this.speed = PLAYER_SPEED * 0.6;
-    this.hp = 2;
+    this.hp = 1;
     this.mode = 'wander';
     this.loseInterestAt = 0;
     this.wanderTargetAt = 0;

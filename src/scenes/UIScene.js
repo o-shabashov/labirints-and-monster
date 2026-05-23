@@ -27,12 +27,19 @@ export class UIScene extends Phaser.Scene {
     this.shieldText = this.add.text(220, 6, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#9fa8da',
     });
-    // оружие: лейбл + xp-бар, прогресс к следующему уровню
+    // оружие: лейбл (ур. + урон + темп) + xp-бар прогресса до next level
     this.weaponLabel = this.add.text(260, 4, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#fff59d',
+      fontFamily: 'monospace', fontSize: '13px', color: '#fff59d',
     });
-    this.weaponBarBg = this.add.rectangle(260, 22, 70, 4, 0x333333).setOrigin(0, 0);
+    this.weaponBarBg = this.add.rectangle(260, 22, 90, 4, 0x333333).setOrigin(0, 0);
     this.weaponBar   = this.add.rectangle(260, 22, 0,  4, 0xfff59d).setOrigin(0, 0);
+
+    // tier монстров — справа отдельный блок
+    this.mobLabel = this.add.text(GAME_W - 12, 28, '', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#ff8a65',
+    }).setOrigin(1, 0);
+    this.mobBarBg = this.add.rectangle(GAME_W - 12 - 90, 44, 90, 4, 0x333333).setOrigin(0, 0);
+    this.mobBar   = this.add.rectangle(GAME_W - 12 - 90, 44, 0,  4, 0xff8a65).setOrigin(0, 0);
     this.keysText = this.add.text(340, 6, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#dddddd',
     });
@@ -100,8 +107,14 @@ export class UIScene extends Phaser.Scene {
     }
     if (state.weaponLevel != null) {
       const xp = state.weaponXp ?? 0;
-      this.weaponLabel.setText(`Оружие  ур. ${state.weaponLevel}`);
-      this.weaponBar.width = 80 * Math.min(1, xp / 5);
+      const dmg = state.weaponDamage ?? state.weaponLevel;
+      const ms  = state.weaponRateMs ?? '?';
+      this.weaponLabel.setText(`Оружие ур.${state.weaponLevel}  урон ${dmg}  ${ms}мс`);
+      this.weaponBar.width = 90 * Math.min(1, xp / 5);
+    }
+    if (state.mobTier != null) {
+      this.mobLabel.setText(`Монстры ур.${state.mobTier}`);
+      this.mobBar.width = 90 * (state.mobTierFraction ?? 0);
     }
   }
 }
