@@ -13,7 +13,6 @@ export function normalizeMove(v) {
 
 const STICK_DEADZONE_MOVE = 0.15;
 const STICK_DEADZONE_AIM = 0.20;
-const GAMEPAD_IDLE_TIMEOUT_MS = 500;
 
 export class Input {
   constructor(scene) {
@@ -24,7 +23,6 @@ export class Input {
     this.prev = {
       dash: false, interact: false, pause: false, shootEdge: false,
     };
-    this.lastGamepadActivity = 0;
     this.activeDevice = 'keyboard';
   }
 
@@ -75,19 +73,20 @@ export class Input {
       gpPause = !!(gp.buttons[9] && gp.buttons[9].pressed);
       gpSprint = !!(gp.buttons[6] && gp.buttons[6].value > 0.2);
       gpShoot = !!(gp.buttons[7] && gp.buttons[7].value > 0.2);
-
-      // активность гейпада: ненулевые стики или нажатая кнопка
-      const anyBtn = gp.buttons.some(b => b && b.pressed);
-      if (anyBtn || gpMove.x !== 0 || gpMove.y !== 0 || gpAim) {
-        this.lastGamepadActivity = performance.now();
-      }
     }
 
-    if (performance.now() - this.lastGamepadActivity < GAMEPAD_IDLE_TIMEOUT_MS) {
-      this.activeDevice = 'gamepad';
-    } else {
-      this.activeDevice = 'keyboard';
-    }
+    // активное устройство переключается только по факту нажатия — без таймера.
+    // мышиное движение НЕ считается активностью (курсор шевелится случайно),
+    // считаем только ЛКМ и нажатия клавиш на клаве, и нажатия кнопок/отклонения стиков на геймпаде.
+    const anyGpActivity = !!gp && (
+      gp.buttons.some(b => b && (b.pressed || (b.value && b.value > 0.2))) ||
+      gpMove.x !== 0 || gpMove.y !== 0 || !!gpAim
+    );
+    const anyKbActivity =
+      mShoot || kbSprint || kbDash || kbInteract || kbPause ||
+      kbMove.x !== 0 || kbMove.y !== 0;
+    if (anyGpActivity) this.activeDevice = 'gamepad';
+    else if (anyKbActivity) this.activeDevice = 'keyboard';
 
     // ---- combine: gamepad overrides keyboard when present ----
     const move = (gpMove.x !== 0 || gpMove.y !== 0) ? gpMove : kbMove;
