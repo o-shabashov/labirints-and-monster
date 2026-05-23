@@ -135,6 +135,9 @@ export class GameScene extends Phaser.Scene {
     // компас — стрелка-точка на краю круга видимости
     this.compassArrow = this.add.graphics().setDepth(12);
 
+    // индикатор направления игрока — белая точка на «макушке» спрайта
+    this.playerDir = this.add.graphics().setDepth(6);
+
     // двери (по тайлам в map) и ключи (по keySpec)
     this.doors = [];
     for (const d of this.map.findDoors()) {
@@ -272,6 +275,19 @@ export class GameScene extends Phaser.Scene {
       const py = this.player.sprite.y + (dy / len) * r;
       this.compassArrow.fillStyle(0xffd54f, 1);
       this.compassArrow.fillCircle(px, py, 5);
+    }
+
+    // индикатор направления — точка на краю спрайта в сторону lastMoveDir
+    this.playerDir.clear();
+    const dir = this.lastMoveDir;
+    if (dir) {
+      const off = 9;  // радиус смещения от центра, ~край sprite 20×20
+      this.playerDir.fillStyle(0xffffff, 1);
+      this.playerDir.fillCircle(
+        this.player.sprite.x + dir.x * off,
+        this.player.sprite.y + dir.y * off,
+        3,
+      );
     }
 
     this.fog.update(this.player.sprite.x, this.player.sprite.y);
