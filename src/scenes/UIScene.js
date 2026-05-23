@@ -6,9 +6,15 @@ export class UIScene extends Phaser.Scene {
     this.hpText = this.add.text(12, 8, '', {
       fontFamily: 'monospace', fontSize: '20px', color: '#ff5252',
     });
+    this.onUpdate({ hp: PLAYER_MAX_HP });
     this.game.events.on('hud:update', this.onUpdate, this);
+    this.events.once('shutdown', () => {
+      this.game.events.off('hud:update', this.onUpdate, this);
+    });
   }
   onUpdate(state) {
-    this.hpText.setText('HP: ' + '♥'.repeat(state.hp) + '♡'.repeat(PLAYER_MAX_HP - state.hp));
+    if (state.hp != null) {
+      this.hpText.setText('HP: ' + '♥'.repeat(state.hp) + '♡'.repeat(PLAYER_MAX_HP - state.hp));
+    }
   }
 }
