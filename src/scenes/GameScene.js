@@ -138,7 +138,7 @@ export class GameScene extends Phaser.Scene {
     // индикатор направления игрока — белая точка на «макушке» спрайта
     this.playerDir = this.add.graphics().setDepth(6);
 
-    // двери — каждая логическая дверь занимает несколько тайлов проёма
+    // двери — одна логическая дверь = один sprite поверх проёма + body на каждом тайле
     this.doors = [];
     for (const spec of (doorSpec || [])) {
       const door = new Door(this, spec.color, spec.cells, this.map);
@@ -149,8 +149,8 @@ export class GameScene extends Phaser.Scene {
           this.doors = this.doors.filter(x => x !== door);
         }
       };
-      for (const s of door.sprites) {
-        this.physics.add.collider(this.player.sprite, s, onTouch);
+      for (const z of door.bodies) {
+        this.physics.add.collider(this.player.sprite, z, onTouch);
       }
       this.doors.push(door);
     }

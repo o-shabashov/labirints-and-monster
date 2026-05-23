@@ -32,11 +32,11 @@ export const TILE = {
   DOOR_B:   12,
 };
 
-export const PLAYER_SPEED = 160;   // px/sec
+export const PLAYER_SPEED = 210;   // px/sec — чуть быстрее, чтобы не «тащиться»
 
 export const PLAYER_SIZE = 20;  // меньше тайла, чтобы пролезать в коридоры
 
-export const VISION_RADIUS_TILES = 5;
+export const VISION_RADIUS_TILES = 7;   // ≈ +33% к прежним 5
 
 export const PLAYER_MAX_HP = 3;
 export const KNOCKBACK_SPEED = 220;

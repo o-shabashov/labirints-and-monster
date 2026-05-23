@@ -28,8 +28,10 @@ export class UIScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '16px', color: '#fff176',
     });
     this.keysText = this.add.text(340, 6, '', {
-      fontFamily: 'monospace', fontSize: '16px',
+      fontFamily: 'monospace', fontSize: '16px', color: '#dddddd',
     });
+    // живые иконки ключей — спрайты flask_*. Заполняются в onUpdate.
+    this.keyIcons = [];
     this.deviceIndicator = this.add.text(GAME_W - 12, 6, '', {
       fontFamily: 'monospace', fontSize: '14px', color: '#888888',
     }).setOrigin(1, 0);
@@ -63,8 +65,19 @@ export class UIScene extends Phaser.Scene {
     if (state.ammo != null) this.ammoText.setText('● ' + state.ammo);
     if (state.stamina != null) this.staminaBar.width = 120 * (state.stamina / 100);
     if (state.keys != null) {
-      const map = { r: '🔴', g: '🟢', b: '🔵' };
-      this.keysText.setText(state.keys.length ? 'Keys: ' + state.keys.map(c => map[c]).join(' ') : '');
+      for (const i of this.keyIcons) i.destroy();
+      this.keyIcons = [];
+      if (state.keys.length) {
+        this.keysText.setText('Keys:');
+        let x = 340 + 60;
+        for (const c of state.keys) {
+          const img = this.add.image(x, 14, 'key_' + c).setOrigin(0, 0.5).setScale(1.5);
+          this.keyIcons.push(img);
+          x += 18;
+        }
+      } else {
+        this.keysText.setText('');
+      }
     }
     if (state.armor != null) {
       this.armorText.setText(state.armor > 0 ? 'Armor: ' + '◆'.repeat(state.armor) : '');
@@ -76,7 +89,7 @@ export class UIScene extends Phaser.Scene {
       this.interactHint.setText(state.interactHint);
     }
     if (state.device != null) {
-      this.deviceIndicator.setText(state.device === 'gamepad' ? '🎮 Gamepad' : '⌨ Keyboard');
+      this.deviceIndicator.setText(state.device === 'gamepad' ? 'Gamepad' : 'Keyboard');
     }
   }
 }

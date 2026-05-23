@@ -9,11 +9,10 @@ import { GAME_W, CANVAS_H } from './config/constants.js';
 const config = {
   type: Phaser.AUTO,
   backgroundColor: '#111418',
-  // pixelArt: true заодно сглаживание для текста/UI ломал и при FIT-зуме всё
-  // становилось «лесенкой». Включаем normal antialiasing на уровне canvas,
-  // а для pixel-art-текстур применяем NEAREST per-texture в BootScene.
-  antialias: true,
-  roundPixels: false,
+  // Pixel-art стиль: NEAREST-сэмплинг для текстур, без blur'а на спрайтах
+  // и стенах. Текст получается крупный и «пиксельный», но это вписывается
+  // в стилистику dungeon-арта 0x72 — лучше чем мутный antialias.
+  pixelArt: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
