@@ -1,12 +1,13 @@
 import { TILE_SIZE, VISION_RADIUS_TILES, BLINDNESS_VISION_RATIO } from '../config/constants.js';
 import { hasEffect } from '../systems/Effects.js';
 
-// Два слоя:
-//   1. solid black per-tile для unexplored клеток (depth 9, под vignette)
-//   2. radial-gradient image, центрированный на игроке (depth 11) — плавный
-//      переход от прозрачного центра к чёрному краю vision-радиуса.
-// Без полупрозрачного «explored memory» слоя: vignette за пределами radius
-// почти полностью чёрный, чтобы старая память не «фонила» через градиент.
+// Три слоя:
+//   depth 9  — dim per-tile: чёрный 0.78 alpha поверх explored клеток, которые
+//              сейчас вне vision-радиуса. Это «помню, но не вижу».
+//   depth 10 — fog per-tile: solid чёрный для всего unexplored.
+//   depth 11 — radial vignette image, центрированная на игроке. Прозрачная
+//              в центре и за пределами vision, max затемнения у границы —
+//              сглаживает «блочный» переход между vision и dim/fog.
 export class FogOfWar {
   constructor(scene, gridW, gridH) {
     this.scene = scene;
@@ -14,11 +15,12 @@ export class FogOfWar {
     this.gridH = gridH;
     this.explored = Array.from({ length: gridH }, () => new Array(gridW).fill(false));
 
-    // unexplored cells: solid black per-tile
-    this.fog = scene.add.graphics();
-    this.fog.setDepth(9);
+    this.dim = scene.add.graphics();
+    this.dim.setDepth(9);
 
-    // radial vignette image
+    this.fog = scene.add.graphics();
+    this.fog.setDepth(10);
+
     this.vignette = scene.add.image(0, 0, 'vignette').setOrigin(0.5).setDepth(11);
     this.fullRadiusPx = VISION_RADIUS_TILES * TILE_SIZE;
     this.currentRadiusPx = this.fullRadiusPx;
@@ -30,7 +32,7 @@ export class FogOfWar {
     const radiusPx = radiusTiles * TILE_SIZE;
     this.currentRadiusPx = radiusPx;
 
-    // обновляем explored по текущему радиусу
+    // расширяем explored
     const tx = Math.floor(playerX / TILE_SIZE);
     const ty = Math.floor(playerY / TILE_SIZE);
     const r = radiusTiles;
@@ -43,7 +45,23 @@ export class FogOfWar {
       }
     }
 
-    // unexplored cells — solid black, чтобы карта вне исследованного не светилась через градиент
+    // explored клетки вне текущего vision — приглушаем
+    this.dim.clear();
+    this.dim.fillStyle(0x000000, 0.78);
+    const radiusPxSq = radiusPx * radiusPx;
+    for (let y = 0; y < this.gridH; y++) {
+      for (let x = 0; x < this.gridW; x++) {
+        if (!this.explored[y][x]) continue;
+        const cx = x * TILE_SIZE + TILE_SIZE / 2;
+        const cy = y * TILE_SIZE + TILE_SIZE / 2;
+        const ddx = cx - playerX, ddy = cy - playerY;
+        if (ddx * ddx + ddy * ddy > radiusPxSq) {
+          this.dim.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
+      }
+    }
+
+    // unexplored — solid black
     this.fog.clear();
     this.fog.fillStyle(0x000000, 1);
     for (let y = 0; y < this.gridH; y++) {
@@ -53,7 +71,7 @@ export class FogOfWar {
       }
     }
 
-    // vignette центрируем на игроке и масштабируем под blindness
+    // vignette — feathering на границе vision
     this.vignette.setPosition(playerX, playerY);
     this.vignette.setScale(radiusPx / this.fullRadiusPx);
   }

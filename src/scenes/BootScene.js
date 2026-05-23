@@ -128,26 +128,24 @@ export class BootScene extends Phaser.Scene {
 
     g.destroy();
 
-    // Радиальный градиент-маска: чёрный с круглой плавной «дыркой» в центре.
-    // Размер 2048 покрывает любую позицию игрока на карте 992×672 (диагональ ≈1200).
-    // Используется поверх мира для плавного затемнения по краям видимости.
-    const size = 2048;
+    // Плавное «кольцо» затемнения у границы видимости — feathering между
+    // нормально освещённым центром и затемнённой explored-памятью снаружи.
+    // Внутри ~70% радиуса и полностью за его пределами — прозрачно. Сам fog
+    // и dim сейчас рисуются тайлово в FogOfWar, vignette только сглаживает
+    // их «блочный» край.
+    const radius = VISION_RADIUS_TILES * TILE_SIZE;
+    const size = radius * 3;
     const cv = document.createElement('canvas');
     cv.width = cv.height = size;
     const cx = cv.getContext('2d');
-    const radius = VISION_RADIUS_TILES * TILE_SIZE;
-    // 1) base: solid black, alpha=1 (полностью скрывает то, что вне vision)
-    cx.fillStyle = 'rgba(0,0,0,1)';
-    cx.fillRect(0, 0, size, size);
-    // 2) вырезаем радиальный gradient в центре через destination-out
-    cx.globalCompositeOperation = 'destination-out';
-    const grad = cx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, radius);
-    grad.addColorStop(0,    'rgba(0,0,0,1)');     // полная прозрачность в центре
-    grad.addColorStop(0.55, 'rgba(0,0,0,0.95)');  // почти полная прозрачность в основной зоне
-    grad.addColorStop(1,    'rgba(0,0,0,0)');     // плавный край — здесь destination не меняется
+    cx.clearRect(0, 0, size, size);
+    const grad = cx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, radius * 1.05);
+    grad.addColorStop(0.0,  'rgba(0,0,0,0)');
+    grad.addColorStop(0.65, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.92, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(1.0,  'rgba(0,0,0,0)');
     cx.fillStyle = grad;
-    cx.fillRect(size / 2 - radius, size / 2 - radius, radius * 2, radius * 2);
-    cx.globalCompositeOperation = 'source-over';
+    cx.fillRect(0, 0, size, size);
     this.textures.addCanvas('vignette', cv);
 
     this.scene.start('MenuScene');
