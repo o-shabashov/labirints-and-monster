@@ -16,6 +16,10 @@ export class Bullet {
   }
 
   update(now, deltaMs = 16) {
+    // пуля могла быть уничтожена в overlap-коллбэке ранее в этом же кадре —
+    // sprite destroyed, body нет. Не лезем дальше: один такой crash тихо
+    // ломал весь update loop и игра «зависала» в кадре столкновения.
+    if (this.dead || !this.sprite || !this.sprite.active || !this.sprite.body) return;
     if (this.target && this.target.sprite && this.target.sprite.active) {
       const vx = this.sprite.body.velocity.x;
       const vy = this.sprite.body.velocity.y;

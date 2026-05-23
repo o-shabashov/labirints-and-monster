@@ -201,7 +201,7 @@ export class GameScene extends Phaser.Scene {
         for (const m of this.monsters) {
           if (!m.sprite.active) continue;
           this.physics.add.overlap(b.sprite, m.sprite, () => {
-            if (b.dead) return;
+            if (b.dead || !m.sprite.active) return;
             b.kill();
             this.sound.hit();
             if (m.takeDamage(1)) {
@@ -216,9 +216,11 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // bullet lifetime + homing turn
+    // bullet lifetime + homing turn — пропускаем мёртвых, их sprite уничтожен
     const now = this.time.now;
-    for (const b of this.bullets) b.update(now, delta);
+    for (const b of this.bullets) {
+      if (!b.dead) b.update(now, delta);
+    }
     this.bullets = this.bullets.filter(b => !b.dead);
 
     for (const m of this.monsters) m.update(delta, this.player, this.map);
