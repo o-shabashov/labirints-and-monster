@@ -18,6 +18,12 @@ import { Chaser } from '../entities/monsters/Chaser.js';
 import { Wanderer } from '../entities/monsters/Wanderer.js';
 import { Guard } from '../entities/monsters/Guard.js';
 import { Shooter } from '../entities/monsters/Shooter.js';
+import { Skeleton } from '../entities/monsters/Skeleton.js';
+import { BigZombie } from '../entities/monsters/BigZombie.js';
+import { Goblin } from '../entities/monsters/Goblin.js';
+import { OrcWarrior } from '../entities/monsters/OrcWarrior.js';
+import { TinyZombie } from '../entities/monsters/TinyZombie.js';
+import { MaskedOrc } from '../entities/monsters/MaskedOrc.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
 import { Door } from '../entities/Door.js';
@@ -41,6 +47,7 @@ export class GameScene extends Phaser.Scene {
     this.lure = null;
     this.lastMoveDir = { x: 1, y: 0 };
     this.lastAimDir = { x: 1, y: 0 };
+    this._inputCooldownUntil = 0;
 
     const seed = Date.now();
     const { grid, keys: keySpec, doors: doorSpec } = generateMaze(GRID_W, GRID_H, seed);
@@ -79,12 +86,18 @@ export class GameScene extends Phaser.Scene {
           if (Math.hypot(dx, dy) >= minDistTiles) candidates.push({ x, y });
         }
       }
-      // 12 wanderer + 7 chaser + 4 guard + 4 shooter = 27 на старте.
+      // Зоопарк: смесь всех 10 типов, около ~30 монстров на старте.
       const plan = [
-        ...Array(12).fill(Wanderer),
-        ...Array(7).fill(Chaser),
-        ...Array(4).fill(Guard),
-        ...Array(4).fill(Shooter),
+        ...Array(8).fill(Wanderer),
+        ...Array(5).fill(Chaser),
+        ...Array(3).fill(Guard),
+        ...Array(3).fill(Shooter),
+        ...Array(3).fill(Skeleton),
+        ...Array(2).fill(BigZombie),
+        ...Array(4).fill(Goblin),
+        ...Array(2).fill(OrcWarrior),
+        ...Array(4).fill(TinyZombie),
+        ...Array(3).fill(MaskedOrc),
       ];
       for (const Cls of plan) {
         if (candidates.length === 0) break;
@@ -134,9 +147,12 @@ export class GameScene extends Phaser.Scene {
     }
     this.nearestChest = null;
 
-    // канал выбора из ChestScene
+    // канал выбора из ChestScene. После resume — короткая блокировка
+    // edge-инпута, иначе та же кнопка A/Space, которой подтвердили выбор,
+    // мгновенно прожимается в Player как dash/shoot.
     this.game.events.on('chest:choice', this._chestChoiceHandler = (type) => {
       this.applyChestReward(type);
+      this._inputCooldownUntil = this.time.now + 300;
       this.scene.resume();
     });
     this.events.once('shutdown', () => {
@@ -185,6 +201,17 @@ export class GameScene extends Phaser.Scene {
   update(_time, delta) {
     this.inputSys.setAimOrigin(this.player.sprite.x, this.player.sprite.y);
     const input = this.inputSys.read();
+    // глушим edge-события сразу после resume из ChestScene — иначе кнопка
+    // подтверждения тут же даёт dash/shoot/interact.
+    if (this.time.now < this._inputCooldownUntil) {
+      input.dash = false;
+      input.shoot = false;
+      input.interact = false;
+      // edge-кнопки помечаем как «уже зажатые», чтобы фронт зарегистрировался
+      // только после физического отпускания кнопки.
+      this.inputSys.prev.dash = true;
+      this.inputSys.prev.interact = true;
+    }
     if (input.move.x !== 0 || input.move.y !== 0) {
       this.lastMoveDir = { x: input.move.x, y: input.move.y };
     }
@@ -481,15 +508,17 @@ export class GameScene extends Phaser.Scene {
     return m;
   }
 
-  // Случайный тип с разумным весом. Чем дольше идёт партия — тем чаще шутеры.
+  // Случайный тип с весами. Со временем — больше танков и шутеров.
   pickMonsterClass() {
     const elapsedSec = (this.time.now - this.stats.startedAt) / 1000;
-    const shooterWeight = Math.min(0.35, 0.1 + elapsedSec / 300);  // до 35%
+    const heavyW = Math.min(0.25, elapsedSec / 240);   // tank/shooter растут
     const r = Math.random();
-    if (r < shooterWeight) return Shooter;
-    if (r < shooterWeight + 0.25) return Chaser;
-    if (r < shooterWeight + 0.45) return Guard;
-    return Wanderer;
+    if (r < heavyW * 0.5) return Shooter;
+    if (r < heavyW * 0.8) return BigZombie;
+    if (r < heavyW) return Guard;
+    // обычная фауна — даём шанс всем
+    const pool = [Wanderer, Chaser, Goblin, Skeleton, OrcWarrior, TinyZombie, MaskedOrc];
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   // FLOOR-клетка далеко от игрока — чтобы новые враги не появлялись на голове

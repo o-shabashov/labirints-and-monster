@@ -8,6 +8,7 @@ export class Guard extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_guard');
     this.speed = PLAYER_SPEED * 0.4;
+    this.hp = 5;             // прокачен в танка
     this.homeTile = this.tilePos();
   }
 

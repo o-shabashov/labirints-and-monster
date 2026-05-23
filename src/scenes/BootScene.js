@@ -12,6 +12,12 @@ const SPRITES = [
   ['monster',          'assets/0x72/chort_idle_anim_f0.png'],            // chaser
   ['monster_wanderer', 'assets/0x72/imp_idle_anim_f0.png'],
   ['monster_guard',    'assets/0x72/big_demon_idle_anim_f0.png'],
+  ['monster_skeleton', 'assets/0x72/skelet_idle_anim_f0.png'],
+  ['monster_bigzombie','assets/0x72/big_zombie_idle_anim_f0.png'],
+  ['monster_goblin',   'assets/0x72/goblin_idle_anim_f0.png'],
+  ['monster_masked',   'assets/0x72/masked_orc_idle_anim_f0.png'],
+  ['monster_orc',      'assets/0x72/orc_warrior_idle_anim_f0.png'],
+  ['monster_tinyzombie','assets/0x72/tiny_zombie_idle_anim_f0.png'],
   ['chest',            'assets/0x72/chest_full_open_anim_f0.png'],
   ['bullet',           'assets/0x72/weapon_arrow.png'],
   ['pickup_heart',     'assets/0x72/ui_heart_full.png'],
