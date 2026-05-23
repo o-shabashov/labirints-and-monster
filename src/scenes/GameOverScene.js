@@ -16,9 +16,39 @@ export class GameOverScene extends Phaser.Scene {
     this.add.text(GAME_W / 2, GAME_H / 2, lines.join('\n'), {
       fontFamily: 'monospace', fontSize: '18px', color: '#dddddd', align: 'center',
     }).setOrigin(0.5);
-    this.add.text(GAME_W / 2, GAME_H / 2 + 90, 'ПРОБЕЛ — заново', {
+    this.add.text(GAME_W / 2, GAME_H / 2 + 90, 'ПРОБЕЛ / любая кнопка геймпада — заново', {
       fontFamily: 'monospace', fontSize: '16px', color: '#888888',
     }).setOrigin(0.5);
-    this.input.keyboard.once('keydown-SPACE', () => this.scene.start('GameScene'));
+    const restart = () => this.scene.start('GameScene');
+    this.input.keyboard.once('keydown-SPACE', restart);
+    pollGamepadOnce(this, restart);
   }
+}
+
+// общий поллер для конечных сцен — слушает любую кнопку до момента нажатия.
+export function pollGamepadOnce(scene, onPress) {
+  // снимаем «отпечаток» начального состояния, чтобы переход не сработал от
+  // ещё зажатой кнопки, которая привела к смерти.
+  const initial = sampleButtons();
+  const tick = () => {
+    if (!scene.scene.isActive()) return;
+    const now = sampleButtons();
+    if (now.some((v, i) => v && !initial[i])) {
+      onPress();
+      return;
+    }
+    scene.time.delayedCall(50, tick);
+  };
+  tick();
+}
+
+function sampleButtons() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const out = [];
+  for (const p of pads) {
+    if (!p) continue;
+    for (let i = 0; i < p.buttons.length; i++) out[i] = !!(p.buttons[i] && p.buttons[i].pressed);
+    return out;
+  }
+  return out;
 }

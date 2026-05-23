@@ -3,8 +3,9 @@ import {
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
   COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES, AMMO_PACK,
-  AIM_CONE_LENGTH, AIM_CONE_HALF_ANGLE,
 } from '../config/constants.js';
+import { hasLineOfSight } from '../systems/Vision.js';
+import { getSound } from '../systems/Sound.js';
 import { TileMap } from '../world/TileMap.js';
 import { Player } from '../entities/Player.js';
 import { generateMaze } from '../world/MazeGenerator.js';
@@ -28,6 +29,7 @@ export class GameScene extends Phaser.Scene {
     // мир рендерится ПОД топ-баром, чтобы HUD не накрывал лабиринт
     this.cameras.main.setViewport(0, TOPBAR_H, GAME_W, GAME_H);
     this.scene.launch('UIScene');
+    this.sound = getSound();
 
     this.gameState = { effects: [] };
     this.bullets = [];
@@ -54,6 +56,7 @@ export class GameScene extends Phaser.Scene {
     this.exitZone = this.add.zone(exitPos.x, exitPos.y, TILE_SIZE, TILE_SIZE);
     this.physics.add.existing(this.exitZone, true);
     this.physics.add.overlap(this.player.sprite, this.exitZone, () => {
+      this.sound.victory();
       this.scene.start('VictoryScene', this.buildSummary());
     });
 
@@ -87,8 +90,12 @@ export class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.player.sprite, m.sprite, () => {
           const took = this.player.takeHit(m.sprite.x, m.sprite.y);
           if (took) {
+            this.sound.playerHurt();
             this.game.events.emit('hud:update', { hp: this.player.hp });
-            if (this.player.isDead()) this.scene.start('GameOverScene', this.buildSummary());
+            if (this.player.isDead()) {
+              this.sound.gameover();
+              this.scene.start('GameOverScene', this.buildSummary());
+            }
           }
         });
         this.monsters.push(m);
@@ -110,6 +117,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.overlap(this.player.sprite, p.sprite, () => {
         p.sprite.destroy();
         this.player.heal(1);
+        this.sound.heal();
         this.game.events.emit('hud:update', { hp: this.player.hp });
       });
       this.pickups.push(p);
@@ -127,9 +135,6 @@ export class GameScene extends Phaser.Scene {
     // компас — стрелка-точка на краю круга видимости
     this.compassArrow = this.add.graphics().setDepth(12);
 
-    // конус прицела — полупрозрачный треугольник в направлении aim
-    this.aimCone = this.add.graphics().setDepth(6);
-
     // двери (по тайлам в map) и ключи (по keySpec)
     this.doors = [];
     for (const d of this.map.findDoors()) {
@@ -137,6 +142,7 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.collider(this.player.sprite, door.sprite, () => {
         if (this.player.hasKey(door.color)) {
           door.open();
+          this.sound.door();
           this.doors = this.doors.filter(x => x !== door);
         }
       });
@@ -151,6 +157,7 @@ export class GameScene extends Phaser.Scene {
         if (!p.sprite.active) return;
         p.sprite.destroy();
         this.player.addKey(k.color);
+        this.sound.keyPickup();
         this.game.events.emit('hud:update', { keys: Array.from(this.player.keys) });
       });
       this.keyPickups.push(p);
@@ -174,30 +181,41 @@ export class GameScene extends Phaser.Scene {
     this.player.setAim(this.lastAimDir);
     this.player.update(input);
 
-    // стрельба
+    // стрельба + самонаведение на ближайшего видимого монстра
     if (input.shoot) {
       const shot = this.player.tryShoot(this.time.now);
       if (shot) {
-        const b = new Bullet(this, shot.ox, shot.oy, shot.x, shot.y);
+        const target = this.findHomingTarget(shot.ox, shot.oy);
+        let dx = shot.x, dy = shot.y;
+        if (target) {
+          const tdx = target.sprite.x - shot.ox;
+          const tdy = target.sprite.y - shot.oy;
+          const m = Math.hypot(tdx, tdy) || 1;
+          dx = tdx / m; dy = tdy / m;
+        }
+        const b = new Bullet(this, shot.ox, shot.oy, dx, dy, target);
         this.physics.add.collider(b.sprite, this.map.walls, () => b.kill());
         for (const m of this.monsters) {
           if (!m.sprite.active) continue;
           this.physics.add.overlap(b.sprite, m.sprite, () => {
             if (b.dead) return;
             b.kill();
+            this.sound.hit();
             if (m.takeDamage(1)) {
+              this.sound.monsterKilled();
               this.stats.monstersKilled++;
               this.monsters = this.monsters.filter(x => x !== m);
             }
           });
         }
         this.bullets.push(b);
+        this.sound.shoot();
       }
     }
 
-    // bullet lifetime
+    // bullet lifetime + homing turn
     const now = this.time.now;
-    for (const b of this.bullets) b.update(now);
+    for (const b of this.bullets) b.update(now, delta);
     this.bullets = this.bullets.filter(b => !b.dead);
 
     for (const m of this.monsters) m.update(delta, this.player, this.map);
@@ -217,6 +235,7 @@ export class GameScene extends Phaser.Scene {
         this.nearestChest = null;
       } else if ((this.player.lureCharges || 0) > 0) {
         this.throwLure();
+        this.sound.pickup();
       }
     }
 
@@ -227,9 +246,11 @@ export class GameScene extends Phaser.Scene {
     const poison = this.gameState.effects.find(e => e.type === 'poison');
     if (poison && pNow >= (poison.nextTickAt || 0) && (poison.ticks || 0) < POISON_TICKS) {
       this.player.hp = Math.max(0, this.player.hp - 1);
+      this.sound.playerHurt();
       poison.ticks = (poison.ticks || 0) + 1;
       poison.nextTickAt = pNow + POISON_TICK_MS;
       if (this.player.isDead()) {
+        this.sound.gameover();
         this.scene.start('GameOverScene', this.buildSummary());
         return;
       }
@@ -251,22 +272,6 @@ export class GameScene extends Phaser.Scene {
       const py = this.player.sprite.y + (dy / len) * r;
       this.compassArrow.fillStyle(0xffd54f, 1);
       this.compassArrow.fillCircle(px, py, 5);
-    }
-
-    // конус прицела
-    this.aimCone.clear();
-    const aimDir = this.lastAimDir;
-    if (aimDir && (aimDir.x !== 0 || aimDir.y !== 0)) {
-      const px = this.player.sprite.x;
-      const py = this.player.sprite.y;
-      const angle = Math.atan2(aimDir.y, aimDir.x);
-      const len = AIM_CONE_LENGTH;
-      const ax = px + Math.cos(angle - AIM_CONE_HALF_ANGLE) * len;
-      const ay = py + Math.sin(angle - AIM_CONE_HALF_ANGLE) * len;
-      const bx = px + Math.cos(angle + AIM_CONE_HALF_ANGLE) * len;
-      const by = py + Math.sin(angle + AIM_CONE_HALF_ANGLE) * len;
-      this.aimCone.fillStyle(0xfff176, 0.18);
-      this.aimCone.fillTriangle(px, py, ax, ay, bx, by);
     }
 
     this.fog.update(this.player.sprite.x, this.player.sprite.y);
@@ -315,6 +320,9 @@ export class GameScene extends Phaser.Scene {
       case 'slow':     addEffect(this.gameState, 'slow', SLOW_DURATION_MS); break;
       case 'blindness':addEffect(this.gameState, 'blindness', BLINDNESS_DURATION_MS); break;
     }
+    const POWER_UPS = new Set(['armor', 'heal', 'ammo', 'compass', 'lure']);
+    if (POWER_UPS.has(type)) this.sound.chestPower();
+    else this.sound.chestDebuff();
     const labels = {
       armor:     { text: 'Броня +2',     color: '#a3d977' },
       heal:      { text: '+1 HP',        color: '#a3d977' },
@@ -341,6 +349,26 @@ export class GameScene extends Phaser.Scene {
       duration: 1500,
       onComplete: () => t.destroy(),
     });
+  }
+
+  // ближайший монстр в радиусе зрения и без стен на луче от точки выстрела
+  findHomingTarget(ox, oy) {
+    const visionPxSq = this.fog.currentRadiusPx * this.fog.currentRadiusPx;
+    const otx = Math.floor(ox / TILE_SIZE);
+    const oty = Math.floor(oy / TILE_SIZE);
+    let best = null, bestDsq = Infinity;
+    for (const m of this.monsters) {
+      if (!m.sprite || !m.sprite.active) continue;
+      const dx = m.sprite.x - ox;
+      const dy = m.sprite.y - oy;
+      const dsq = dx * dx + dy * dy;
+      if (dsq > visionPxSq) continue;
+      const mtx = Math.floor(m.sprite.x / TILE_SIZE);
+      const mty = Math.floor(m.sprite.y / TILE_SIZE);
+      if (!hasLineOfSight(this.map.tiles, otx, oty, mtx, mty)) continue;
+      if (dsq < bestDsq) { bestDsq = dsq; best = m; }
+    }
+    return best;
   }
 
   countFloorCells() {

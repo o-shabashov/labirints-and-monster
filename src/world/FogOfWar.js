@@ -39,9 +39,9 @@ export class FogOfWar {
       }
     }
 
-    // dim: explored-but-out-of-vision -> grey 40%, unexplored -> rendered by fog
+    // dim: explored-but-out-of-vision -> сильнее затенено, чтобы было «вспоминаю», а не «вижу».
     this.dim.clear();
-    this.dim.fillStyle(0x000000, 0.55);
+    this.dim.fillStyle(0x000000, 0.82);
     for (let y = 0; y < this.gridH; y++) {
       for (let x = 0; x < this.gridW; x++) {
         if (!this.explored[y][x]) continue;

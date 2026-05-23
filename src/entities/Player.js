@@ -6,6 +6,7 @@ import {
 } from '../config/constants.js';
 import { applyKnockback, KNOCKBACK_DURATION, INVULNERABILITY_DURATION } from '../systems/Combat.js';
 import { hasEffect } from '../systems/Effects.js';
+import { getSound } from '../systems/Sound.js';
 
 export class Player {
   constructor(scene, x, y) {
@@ -111,6 +112,7 @@ export class Player {
       this.dashUntil = now + DASH_DURATION_MS;
       this.dashCooldownUntil = now + DASH_COOLDOWN_MS;
       this.iframesUntil = Math.max(this.iframesUntil, this.dashUntil);
+      getSound().dash();
       return;
     }
 

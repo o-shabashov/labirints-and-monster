@@ -46,7 +46,7 @@ export const IFRAMES_MS = 400;
 export const BULLET_SPEED = 500;
 export const BULLET_LIFETIME_MS = 800;
 export const FIRE_RATE_MS = 300;
-export const STARTING_AMMO = 12;
+export const STARTING_AMMO = 32;
 export const MONSTER_HP_DEFAULT = 1;
 
 export const STAMINA_MAX = 100;
@@ -56,9 +56,6 @@ export const SPRINT_MULTIPLIER = 1.6;
 export const DASH_DISTANCE = 96;      // px (3 тайла)
 export const DASH_DURATION_MS = 180;
 export const DASH_COOLDOWN_MS = 1500;
-
-export const AIM_CONE_LENGTH = 100;            // px
-export const AIM_CONE_HALF_ANGLE = Math.PI / 7; // ≈25.7°
 
 export const WANDERER_VISION_TILES = 4;
 export const WANDERER_LOSE_INTEREST_MS = 3000;
