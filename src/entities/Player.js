@@ -1,5 +1,5 @@
 import {
-  PLAYER_SPEED, PLAYER_MAX_HP, FIRE_RATE_MS, STARTING_AMMO,
+  PLAYER_SPEED, PLAYER_SIZE, PLAYER_MAX_HP, FIRE_RATE_MS, STARTING_AMMO,
   STAMINA_MAX, STAMINA_SPRINT_PER_SEC, STAMINA_REGEN_PER_SEC,
   SPRINT_MULTIPLIER, DASH_DISTANCE, DASH_DURATION_MS, DASH_COOLDOWN_MS,
   ARMOR_MAX, ARMOR_REGEN_DELAY_MS, SLOW_MULTIPLIER,
@@ -11,7 +11,9 @@ export class Player {
   constructor(scene, x, y) {
     this.scene = scene;
     this.sprite = scene.physics.add.sprite(x, y, 'player');
-    this.sprite.setCollideWorldBounds(true);
+    // круглый hitbox плавнее скользит по углам стен — без «трения» в коридорах.
+    // рамка стен уже не выпускает игрока за пределы карты, world bounds не нужны.
+    this.sprite.body.setCircle(PLAYER_SIZE / 2);
     this.hp = PLAYER_MAX_HP;
     this.knockbackUntil = 0;
     this.iframesUntil = 0;

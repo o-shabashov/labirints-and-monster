@@ -285,6 +285,32 @@ export class GameScene extends Phaser.Scene {
       case 'slow':     addEffect(this.gameState, 'slow', SLOW_DURATION_MS); break;
       case 'blindness':addEffect(this.gameState, 'blindness', BLINDNESS_DURATION_MS); break;
     }
+    const labels = {
+      armor:     { text: 'Броня +2',     color: '#a3d977' },
+      heal:      { text: '+1 HP',        color: '#a3d977' },
+      ammo:      { text: '+6 патронов',  color: '#a3d977' },
+      compass:   { text: 'Компас',       color: '#a3d977' },
+      lure:      { text: 'Приманка +1',  color: '#a3d977' },
+      poison:    { text: 'Отравление!',  color: '#ff5252' },
+      slow:      { text: 'Замедление!',  color: '#ff5252' },
+      blindness: { text: 'Слепота!',     color: '#ff5252' },
+    };
+    const l = labels[type];
+    if (l) this.showToast(l.text, l.color);
+  }
+
+  showToast(text, color = '#ffffff') {
+    const t = this.add.text(this.player.sprite.x, this.player.sprite.y - 28, text, {
+      fontFamily: 'monospace', fontSize: '18px', color,
+      stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(15);
+    this.tweens.add({
+      targets: t,
+      y: t.y - 32,
+      alpha: { from: 1, to: 0 },
+      duration: 1500,
+      onComplete: () => t.destroy(),
+    });
   }
 
   countFloorCells() {
