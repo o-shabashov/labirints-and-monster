@@ -41,6 +41,14 @@ export class BootScene extends Phaser.Scene {
     g.lineStyle(2, 0xffffff, 1);
     g.strokeRect(1, 1, PLAYER_SIZE - 2, PLAYER_SIZE - 2);
     g.generateTexture('player', PLAYER_SIZE, PLAYER_SIZE);
+    g.clear();
+
+    // monster
+    g.fillStyle(COLOR.MONSTER, 1);
+    g.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
+    g.lineStyle(2, 0x000000, 1);
+    g.strokeRect(1, 1, PLAYER_SIZE - 2, PLAYER_SIZE - 2);
+    g.generateTexture('monster', PLAYER_SIZE, PLAYER_SIZE);
     g.destroy();
 
     this.scene.start('GameScene');
