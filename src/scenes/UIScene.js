@@ -23,6 +23,9 @@ export class UIScene extends Phaser.Scene {
     this.interactHint = this.add.text(GAME_W / 2, GAME_H - 30, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#ffd54f',
     }).setOrigin(0.5);
+    this.deviceIndicator = this.add.text(GAME_W - 12, 8, '', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#888888',
+    }).setOrigin(1, 0);
 
     this.onUpdate({ hp: PLAYER_MAX_HP });
     this.onUpdate({ ammo: STARTING_AMMO });
@@ -54,6 +57,9 @@ export class UIScene extends Phaser.Scene {
     }
     if (state.interactHint != null) {
       this.interactHint.setText(state.interactHint);
+    }
+    if (state.device != null) {
+      this.deviceIndicator.setText(state.device === 'gamepad' ? '🎮 Gamepad' : '⌨ Keyboard');
     }
   }
 }

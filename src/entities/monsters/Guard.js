@@ -1,6 +1,6 @@
 import { Monster } from '../Monster.js';
 import { bfsNextStep } from '../../systems/PathFinding.js';
-import { TILE_SIZE, PLAYER_SPEED, GUARD_PATROL_HALF, TILE } from '../../config/constants.js';
+import { PLAYER_SPEED, GUARD_PATROL_HALF } from '../../config/constants.js';
 
 const REPATH_MS = 250;
 
@@ -19,10 +19,7 @@ export class Guard extends Monster {
   update(dtMs, player, map) {
     this.repathTimer -= dtMs;
     const mt = this.tilePos();
-    const pt = {
-      x: Math.floor(player.sprite.x / TILE_SIZE),
-      y: Math.floor(player.sprite.y / TILE_SIZE),
-    };
+    const pt = this.getTargetTile(player);
     const playerInZone = this.inHomeZone(pt.x, pt.y);
 
     if (this.repathTimer <= 0 || !this.target) {

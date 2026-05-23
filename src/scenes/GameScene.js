@@ -2,7 +2,7 @@ import {
   TILE, TILE_SIZE, GRID_W, GRID_H, VISION_RADIUS_TILES,
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
-  COMPASS_DURATION_MS, LURE_DURATION_MS, AMMO_PACK,
+  COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES, AMMO_PACK,
 } from '../config/constants.js';
 import { TileMap } from '../world/TileMap.js';
 import { Player } from '../entities/Player.js';
@@ -28,10 +28,19 @@ export class GameScene extends Phaser.Scene {
 
     this.gameState = { effects: [] };
     this.bullets = [];
+    this.lure = null;
+    this.lastMoveDir = { x: 1, y: 0 };
 
     const seed = Date.now();
     const { grid, keys: keySpec } = generateMaze(GRID_W, GRID_H, seed);
     this.map = new TileMap(this, grid);
+
+    this.stats = {
+      startedAt: this.time.now,
+      monstersKilled: 0,
+      totalCells: this.countFloorCells(),
+    };
+
     const e = this.map.entrance;
     const spawn = this.map.tileToWorld(e.x, e.y);
     this.player = new Player(this, spawn.x, spawn.y);
@@ -41,7 +50,7 @@ export class GameScene extends Phaser.Scene {
     this.exitZone = this.add.zone(exitPos.x, exitPos.y, TILE_SIZE, TILE_SIZE);
     this.physics.add.existing(this.exitZone, true);
     this.physics.add.overlap(this.player.sprite, this.exitZone, () => {
-      this.scene.start('VictoryScene');
+      this.scene.start('VictoryScene', this.buildSummary());
     });
 
     this.inputSys = new Input(this);
@@ -75,7 +84,7 @@ export class GameScene extends Phaser.Scene {
           const took = this.player.takeHit(m.sprite.x, m.sprite.y);
           if (took) {
             this.game.events.emit('hud:update', { hp: this.player.hp });
-            if (this.player.isDead()) this.scene.start('GameOverScene');
+            if (this.player.isDead()) this.scene.start('GameOverScene', this.buildSummary());
           }
         });
         this.monsters.push(m);
@@ -145,6 +154,9 @@ export class GameScene extends Phaser.Scene {
   update(_time, delta) {
     this.inputSys.setAimOrigin(this.player.sprite.x, this.player.sprite.y);
     const input = this.inputSys.read();
+    if (input.move.x !== 0 || input.move.y !== 0) {
+      this.lastMoveDir = { x: input.move.x, y: input.move.y };
+    }
     this.player.setAim(input.aim);
     this.player.update(input);
 
@@ -160,6 +172,7 @@ export class GameScene extends Phaser.Scene {
             if (b.dead) return;
             b.kill();
             if (m.takeDamage(1)) {
+              this.stats.monstersKilled++;
               this.monsters = this.monsters.filter(x => x !== m);
             }
           });
@@ -182,11 +195,15 @@ export class GameScene extends Phaser.Scene {
       const d = Math.hypot(ch.sprite.x - this.player.sprite.x, ch.sprite.y - this.player.sprite.y);
       if (d < TILE_SIZE) { this.nearestChest = ch; break; }
     }
-    if (input.interact && this.nearestChest) {
-      const reward = this.nearestChest.open();
-      this.applyChestReward(reward);
-      this.chests = this.chests.filter(c => !c.opened);
-      this.nearestChest = null;
+    if (input.interact) {
+      if (this.nearestChest) {
+        const reward = this.nearestChest.open();
+        this.applyChestReward(reward);
+        this.chests = this.chests.filter(c => !c.opened);
+        this.nearestChest = null;
+      } else if ((this.player.lureCharges || 0) > 0) {
+        this.throwLure();
+      }
     }
 
     // эффекты во времени
@@ -199,7 +216,7 @@ export class GameScene extends Phaser.Scene {
       poison.ticks = (poison.ticks || 0) + 1;
       poison.nextTickAt = pNow + POISON_TICK_MS;
       if (this.player.isDead()) {
-        this.scene.start('GameOverScene');
+        this.scene.start('GameOverScene', this.buildSummary());
         return;
       }
     }
@@ -232,6 +249,8 @@ export class GameScene extends Phaser.Scene {
       armor: this.player.armor,
       effects: this.gameState.effects.map(e => ({ type: e.type, msLeft: e.expiresAt - pNow })),
       interactHint: this.nearestChest ? 'E / X — открыть сундук' : '',
+      device: this.inputSys.activeDevice,
+      lureCharges: this.player.lureCharges || 0,
     });
   }
 
@@ -246,6 +265,48 @@ export class GameScene extends Phaser.Scene {
       case 'slow':     addEffect(this.gameState, 'slow', SLOW_DURATION_MS); break;
       case 'blindness':addEffect(this.gameState, 'blindness', BLINDNESS_DURATION_MS); break;
     }
+  }
+
+  countFloorCells() {
+    let n = 0;
+    for (const row of this.map.tiles) for (const t of row) if (t !== TILE.WALL) n++;
+    return n;
+  }
+
+  exploredPercent() {
+    let n = 0;
+    for (const row of this.fog.explored) for (const v of row) if (v) n++;
+    return Math.round((n / this.stats.totalCells) * 100);
+  }
+
+  buildSummary() {
+    return {
+      timeSec: Math.floor((this.time.now - this.stats.startedAt) / 1000),
+      killed: this.stats.monstersKilled,
+      explored: this.exploredPercent(),
+    };
+  }
+
+  throwLure() {
+    this.player.lureCharges -= 1;
+    const dir = this.lastMoveDir || { x: 1, y: 0 };
+    const tx = Math.floor(this.player.sprite.x / TILE_SIZE) + Math.round(dir.x * LURE_THROW_TILES);
+    const ty = Math.floor(this.player.sprite.y / TILE_SIZE) + Math.round(dir.y * LURE_THROW_TILES);
+    const safeTx = Math.max(1, Math.min(GRID_W - 2, tx));
+    const safeTy = Math.max(1, Math.min(GRID_H - 2, ty));
+    const w = this.map.tileToWorld(safeTx, safeTy);
+    const lureSprite = this.add.circle(w.x, w.y, 8, 0xffeb3b).setDepth(6);
+    this.lure = {
+      x: w.x,
+      y: w.y,
+      tile: { x: safeTx, y: safeTy },
+      expiresAt: this.time.now + LURE_DURATION_MS,
+      sprite: lureSprite,
+    };
+    this.time.delayedCall(LURE_DURATION_MS, () => {
+      lureSprite.destroy();
+      if (this.lure && this.lure.sprite === lureSprite) this.lure = null;
+    });
   }
 }
 

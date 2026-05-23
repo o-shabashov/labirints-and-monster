@@ -1,4 +1,4 @@
-import { TILE_SIZE } from '../config/constants.js';
+import { TILE_SIZE, LURE_RANGE_TILES } from '../config/constants.js';
 
 export class Monster {
   constructor(scene, x, y, texture = 'monster') {
@@ -21,6 +21,19 @@ export class Monster {
     return {
       x: Math.floor(this.sprite.x / TILE_SIZE),
       y: Math.floor(this.sprite.y / TILE_SIZE),
+    };
+  }
+
+  getTargetTile(player) {
+    const lure = this.scene.lure;
+    const mt = this.tilePos();
+    if (lure) {
+      const dx = lure.tile.x - mt.x, dy = lure.tile.y - mt.y;
+      if (Math.hypot(dx, dy) <= LURE_RANGE_TILES) return lure.tile;
+    }
+    return {
+      x: Math.floor(player.sprite.x / TILE_SIZE),
+      y: Math.floor(player.sprite.y / TILE_SIZE),
     };
   }
 

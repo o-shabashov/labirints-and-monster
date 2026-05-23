@@ -128,6 +128,6 @@ export class BootScene extends Phaser.Scene {
 
     g.destroy();
 
-    this.scene.start('GameScene');
+    this.scene.start('MenuScene');
   }
 }

@@ -1,6 +1,6 @@
 import { Monster } from '../Monster.js';
 import { bfsNextStep } from '../../systems/PathFinding.js';
-import { TILE_SIZE, PLAYER_SPEED } from '../../config/constants.js';
+import { PLAYER_SPEED } from '../../config/constants.js';
 
 const REPATH_MS = 250;
 
@@ -16,10 +16,7 @@ export class Chaser extends Monster {
     if (this.repathTimer <= 0 || !this.target) {
       this.repathTimer = REPATH_MS;
       const mt = this.tilePos();
-      const pt = {
-        x: Math.floor(player.sprite.x / TILE_SIZE),
-        y: Math.floor(player.sprite.y / TILE_SIZE),
-      };
+      const pt = this.getTargetTile(player);
       const step = bfsNextStep(map.tiles, mt.x, mt.y, pt.x, pt.y);
       if (step) this.target = map.tileToWorld(step.x, step.y);
       else this.target = null;
