@@ -91,7 +91,9 @@ export class Input {
 
     // ---- combine: gamepad overrides keyboard when present ----
     const move = (gpMove.x !== 0 || gpMove.y !== 0) ? gpMove : kbMove;
-    const aim = gpAim || mAim;
+    // aim берётся из активного устройства: мышь не «протекает» в геймпад-режим
+    // (и наоборот). Без этого курсор мыши таскал бы прицел во время игры на геймпаде.
+    const aim = this.activeDevice === 'gamepad' ? gpAim : mAim;
     const shoot = gpShoot || mShoot;
     const sprint = gpSprint || kbSprint;
     const dashHeld = gpDash || kbDash;
