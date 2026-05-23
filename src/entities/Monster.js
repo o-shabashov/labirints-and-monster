@@ -4,7 +4,10 @@ export class Monster {
   constructor(scene, x, y, texture = 'monster') {
     this.scene = scene;
     this.sprite = scene.physics.add.sprite(x, y, texture);
-    this.sprite.setCollideWorldBounds(true);
+    this.sprite.setScale(2);  // ассеты 16×*, рендер 2x
+    const w = this.sprite.width, h = this.sprite.height;
+    const r = 5;
+    this.sprite.body.setCircle(r, (w - r * 2) / 2, (h - r * 2) / 2);
     this.repathTimer = 0;
     this.target = null;          // { x, y } в pixel
     this.speed = 100;

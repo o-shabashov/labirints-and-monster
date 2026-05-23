@@ -21,6 +21,7 @@ export class Pickup {
     // pickup_ammo пока не создаётся в BootScene → fallback на heart
     const safeTex = scene.textures.exists(tex) ? tex : 'pickup_heart';
     this.sprite = scene.physics.add.sprite(x, y, safeTex);
+    this.sprite.setScale(2);
     this.sprite.body.setAllowGravity(false);
     this.sprite.body.setImmovable(true);
     this.sprite.pickupRef = this;

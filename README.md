@@ -43,7 +43,12 @@ npm test
 
 - Phaser 3 (через CDN)
 - Vanilla ES-модули, без сборщика
-- Pixel-art, сгенерированный программно через `Graphics.generateTexture`
+
+## Ассеты и кредиты
+
+- **Графика** — `0x72`, [DungeonTilesetII v1.7](https://0x72.itch.io/dungeontileset-ii). Лицензия [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). Файлы в `assets/0x72/`.
+- **Звуковые эффекты** — [Kenney](https://kenney.nl/), паки [Interface Sounds](https://kenney.nl/assets/interface-sounds) и [Impact Sounds](https://kenney.nl/assets/impact-sounds). Лицензия [CC0](https://creativecommons.org/publicdomain/zero/1.0/). Файлы в `assets/sfx/`.
+- **Музыка** — «Hidden Past» от [Kevin MacLeod](https://incompetech.com), [incompetech.com](https://incompetech.com/music/royalty-free/music.html). Лицензия [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). Файл в `assets/music/`.
 
 ## Документы
 

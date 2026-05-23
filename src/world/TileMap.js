@@ -13,26 +13,27 @@ export class TileMap {
   render() {
     this.entrance = null;
     this.exit = null;
+    // ассеты 16×16, тайл — 32×32, поэтому setScale(2) везде
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const px = x * TILE_SIZE + TILE_SIZE / 2;
         const py = y * TILE_SIZE + TILE_SIZE / 2;
         const t = this.tiles[y][x];
         if (t === TILE.WALL) {
-          this.walls.create(px, py, 'wall').refreshBody();
+          const w = this.walls.create(px, py, 'wall');
+          w.setScale(2).refreshBody();
           continue;
         }
         if (t === TILE.DOOR_R || t === TILE.DOOR_G || t === TILE.DOOR_B) {
-          // подложка пола под дверью; сама дверь будет создана в GameScene как сущность
-          this.scene.add.image(px, py, 'floor');
+          this.scene.add.image(px, py, 'floor').setScale(2);
           continue;
         }
-        this.scene.add.image(px, py, 'floor');
+        this.scene.add.image(px, py, 'floor').setScale(2);
         if (t === TILE.ENTRANCE) {
-          this.scene.add.image(px, py, 'entrance');
+          this.scene.add.image(px, py, 'entrance').setScale(2);
           this.entrance = { x, y };
         } else if (t === TILE.EXIT) {
-          this.scene.add.image(px, py, 'exit');
+          this.scene.add.image(px, py, 'exit').setScale(2);
           this.exit = { x, y };
         }
       }

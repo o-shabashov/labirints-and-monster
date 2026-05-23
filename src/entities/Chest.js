@@ -5,6 +5,8 @@ export class Chest {
   constructor(scene, x, y) {
     this.scene = scene;
     this.sprite = scene.physics.add.staticImage(x, y, 'chest');
+    this.sprite.setScale(2);
+    this.sprite.refreshBody();
     this.sprite.chestRef = this;
     this.opened = false;
   }

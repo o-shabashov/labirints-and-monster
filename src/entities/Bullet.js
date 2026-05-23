@@ -8,6 +8,9 @@ const MAX_TURN_RAD_PER_SEC = Math.PI * 3;  // ~540°/сек — заметное
 export class Bullet {
   constructor(scene, x, y, dirX, dirY, target = null) {
     this.sprite = scene.physics.add.sprite(x, y, 'bullet');
+    this.sprite.setScale(2);
+    // повернём sprite по направлению полёта — стрела «целится» куда летит
+    this.sprite.setRotation(Math.atan2(dirY, dirX));
     this.sprite.body.setAllowGravity(false);
     this.sprite.body.setVelocity(dirX * BULLET_SPEED, dirY * BULLET_SPEED);
     this.dieAt = scene.time.now + BULLET_LIFETIME_MS;
@@ -35,6 +38,7 @@ export class Bullet {
       const turn = Math.max(-maxTurn, Math.min(maxTurn, diff));
       const newAngle = curAngle + turn;
       this.sprite.body.setVelocity(Math.cos(newAngle) * BULLET_SPEED, Math.sin(newAngle) * BULLET_SPEED);
+      this.sprite.setRotation(newAngle);
     } else {
       this.target = null;
     }

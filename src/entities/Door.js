@@ -6,6 +6,9 @@ const TILE_TO_COLOR = {
   [TILE.DOOR_B]: 'b',
 };
 
+// hex-цвет tint'а для соответствующего цвета двери — visual подсказка игроку.
+const TINT = { r: 0xff5252, g: 0x66bb6a, b: 0x42a5f5 };
+
 export class Door {
   constructor(scene, tx, ty, tile, map) {
     this.scene = scene;
@@ -14,10 +17,12 @@ export class Door {
     this.tile = tile;
     this.color = TILE_TO_COLOR[tile];
     this.map = map;
-    const tex = 'door_' + this.color;
     const wx = tx * TILE_SIZE + TILE_SIZE / 2;
     const wy = ty * TILE_SIZE + TILE_SIZE / 2;
-    this.sprite = scene.physics.add.staticImage(wx, wy, tex);
+    this.sprite = scene.physics.add.staticImage(wx, wy, 'door_base');
+    this.sprite.setScale(2);
+    this.sprite.setTint(TINT[this.color]);
+    this.sprite.refreshBody();
     this.sprite.doorRef = this;
   }
 

@@ -12,11 +12,7 @@ const config = {
   height: CANVAS_H,
   backgroundColor: '#111418',
   pixelArt: true,
-  // Используем собственный WebAudio из systems/Sound.js, ctx создаётся только
-  // после нажатия Space — без этой опции Phaser создаёт свой SoundManager
-  // прямо при new Phaser.Game(), и браузер кидает «AudioContext was not allowed
-  // to start» до первого взаимодействия.
-  audio: { noAudio: true },
+  // Phaser SoundManager сам обработает user-gesture unlock при первом нажатии.
   physics: {
     default: 'arcade',
     arcade: { debug: false },
@@ -24,4 +20,7 @@ const config = {
   scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene, VictoryScene],
 };
 
+import { getSound } from './systems/Sound.js';
+
 window.__game = new Phaser.Game(config);
+getSound().attach(window.__game);

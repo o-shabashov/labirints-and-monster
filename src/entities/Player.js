@@ -12,9 +12,13 @@ export class Player {
   constructor(scene, x, y) {
     this.scene = scene;
     this.sprite = scene.physics.add.sprite(x, y, 'player');
-    // круглый hitbox плавнее скользит по углам стен — без «трения» в коридорах.
-    // рамка стен уже не выпускает игрока за пределы карты, world bounds не нужны.
-    this.sprite.body.setCircle(PLAYER_SIZE / 2);
+    // 0x72-спрайт оригинал ~16×28, рендерим 2x чтобы попасть в TILE_SIZE 32.
+    this.sprite.setScale(2);
+    // circular hitbox plows around corners cleanly; offset так, чтобы тело
+    // оказалось примерно в торсе спрайта, а не в его макушке.
+    const w = this.sprite.width, h = this.sprite.height;
+    const r = PLAYER_SIZE / 4; // radius в unscaled coords, под scale=2 даёт ~20 px display
+    this.sprite.body.setCircle(r, (w - r * 2) / 2, (h - r * 2) / 2);
     this.hp = PLAYER_MAX_HP;
     this.knockbackUntil = 0;
     this.iframesUntil = 0;

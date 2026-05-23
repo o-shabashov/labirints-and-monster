@@ -1,150 +1,103 @@
 import { TILE_SIZE, PLAYER_SIZE, COLOR, VISION_RADIUS_TILES } from '../config/constants.js';
 
+// Маппинг логических ключей текстур (как они называются в игре) → файл из
+// 0x72 DungeonTilesetII в assets/0x72/. Tinted-варианты (door_r/g/b,
+// key_r/g/b) и т.п. делаются tint'ом во время использования.
+const SPRITES = [
+  ['floor',            'assets/0x72/floor_1.png'],
+  ['wall',             'assets/0x72/wall_mid.png'],
+  ['entrance',         'assets/0x72/floor_ladder.png'],
+  ['exit',             'assets/0x72/floor_stairs.png'],
+  ['player',           'assets/0x72/wizzard_m_idle_anim_f0.png'],
+  ['monster',          'assets/0x72/chort_idle_anim_f0.png'],            // chaser
+  ['monster_wanderer', 'assets/0x72/imp_idle_anim_f0.png'],
+  ['monster_guard',    'assets/0x72/big_demon_idle_anim_f0.png'],
+  ['chest',            'assets/0x72/chest_full_open_anim_f0.png'],
+  ['bullet',           'assets/0x72/weapon_arrow.png'],
+  ['pickup_heart',     'assets/0x72/ui_heart_full.png'],
+  ['pickup_ammo',      'assets/0x72/flask_yellow.png'],
+  ['door_base',        'assets/0x72/doors_leaf_closed.png'],
+  ['key_r',            'assets/0x72/flask_red.png'],
+  ['key_g',            'assets/0x72/flask_green.png'],
+  ['key_b',            'assets/0x72/flask_blue.png'],
+];
+
+const SFX = [
+  ['sfx_shoot',          'assets/sfx/shoot.ogg'],
+  ['sfx_hit',            'assets/sfx/hit.ogg'],
+  ['sfx_player_hurt',    'assets/sfx/player_hurt.ogg'],
+  ['sfx_monster_killed', 'assets/sfx/monster_killed.ogg'],
+  ['sfx_heal',           'assets/sfx/heal.ogg'],
+  ['sfx_key_pickup',     'assets/sfx/key_pickup.ogg'],
+  ['sfx_dash',           'assets/sfx/dash.ogg'],
+  ['sfx_door',           'assets/sfx/door.ogg'],
+  ['sfx_chest_power',    'assets/sfx/chest_power.ogg'],
+  ['sfx_chest_debuff',   'assets/sfx/chest_debuff.ogg'],
+  ['sfx_victory',        'assets/sfx/victory.ogg'],
+  ['sfx_gameover',       'assets/sfx/gameover.ogg'],
+  ['sfx_pickup',         'assets/sfx/pickup.ogg'],
+];
+
+const MUSIC = [
+  ['music_dungeon',      'assets/music/bg_dungeon.ogg'],
+];
+
+// Цветные двери — дублируем base PNG с tint'ом через runtime: Phaser tint
+// применяется при создании sprite, поэтому отдельные текстуры не нужны.
+// Door сам решает какой tint выставить по своему `color`.
+
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene');
   }
+
+  preload() {
+    for (const [key, path] of SPRITES) this.load.image(key, path);
+    for (const [key, path] of SFX) this.load.audio(key, path);
+    for (const [key, path] of MUSIC) this.load.audio(key, path);
+
+    // прогресс-бар во время загрузки
+    const w = this.cameras.main.width, h = this.cameras.main.height;
+    const bar = this.add.rectangle(w / 2, h / 2, 300, 8, 0x222222).setOrigin(0.5);
+    const fill = this.add.rectangle(w / 2 - 150, h / 2, 0, 8, 0x4ec9ff).setOrigin(0, 0.5);
+    this.add.text(w / 2, h / 2 - 24, 'Loading…', {
+      fontFamily: 'monospace', fontSize: '16px', color: '#aaaaaa',
+    }).setOrigin(0.5);
+    this.load.on('progress', (p) => { fill.width = 300 * p; });
+  }
+
   create() {
-    const g = this.add.graphics();
-
-    // wall
-    g.fillStyle(COLOR.WALL, 1);
-    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    g.lineStyle(2, 0x000000, 0.4);
-    g.strokeRect(1, 1, TILE_SIZE - 2, TILE_SIZE - 2);
-    g.generateTexture('wall', TILE_SIZE, TILE_SIZE);
-    g.clear();
-
-    // floor
-    g.fillStyle(COLOR.FLOOR, 1);
-    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    g.generateTexture('floor', TILE_SIZE, TILE_SIZE);
-    g.clear();
-
-    // entrance
-    g.fillStyle(COLOR.ENTRANCE, 1);
-    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    g.generateTexture('entrance', TILE_SIZE, TILE_SIZE);
-    g.clear();
-
-    // exit
-    g.fillStyle(COLOR.EXIT, 1);
-    g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-    g.lineStyle(3, 0x000000, 1);
-    g.strokeRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
-    g.generateTexture('exit', TILE_SIZE, TILE_SIZE);
-    g.clear();
-
-    // player
-    g.fillStyle(COLOR.PLAYER, 1);
-    g.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
-    g.lineStyle(2, 0xffffff, 1);
-    g.strokeRect(1, 1, PLAYER_SIZE - 2, PLAYER_SIZE - 2);
-    g.generateTexture('player', PLAYER_SIZE, PLAYER_SIZE);
-    g.clear();
-
-    // monster
-    g.fillStyle(COLOR.MONSTER, 1);
-    g.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
-    g.lineStyle(2, 0x000000, 1);
-    g.strokeRect(1, 1, PLAYER_SIZE - 2, PLAYER_SIZE - 2);
-    g.generateTexture('monster', PLAYER_SIZE, PLAYER_SIZE);
-    g.clear();
-
-    // pickup: heart
-    g.fillStyle(0xff5252, 1);
-    g.fillCircle(8, 8, 6);
-    g.generateTexture('pickup_heart', 16, 16);
-    g.clear();
-
-    // bullet
-    g.fillStyle(COLOR.BULLET, 1);
-    g.fillCircle(4, 4, 4);
-    g.generateTexture('bullet', 8, 8);
-    g.clear();
-
-    // wanderer (orange)
-    g.fillStyle(0xff9800, 1);
-    g.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
-    g.lineStyle(2, 0x000000, 1);
-    g.strokeRect(1, 1, PLAYER_SIZE - 2, PLAYER_SIZE - 2);
-    g.generateTexture('monster_wanderer', PLAYER_SIZE, PLAYER_SIZE);
-    g.clear();
-
-    // guard (purple)
-    g.fillStyle(0x9c27b0, 1);
-    g.fillRect(0, 0, PLAYER_SIZE, PLAYER_SIZE);
-    g.lineStyle(2, 0x000000, 1);
-    g.strokeRect(1, 1, PLAYER_SIZE - 2, PLAYER_SIZE - 2);
-    g.generateTexture('monster_guard', PLAYER_SIZE, PLAYER_SIZE);
-    g.clear();
-
-    // doors R/G/B
-    const doors = [
-      ['door_r', COLOR.KEY_R],
-      ['door_g', COLOR.KEY_G],
-      ['door_b', COLOR.KEY_B],
-    ];
-    for (const [name, color] of doors) {
-      g.fillStyle(color, 1);
-      g.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-      g.lineStyle(3, 0x000000, 1);
-      g.strokeRect(2, 2, TILE_SIZE - 4, TILE_SIZE - 4);
-      g.generateTexture(name, TILE_SIZE, TILE_SIZE);
-      g.clear();
-    }
-
-    // keys R/G/B
-    const keys = [
-      ['key_r', COLOR.KEY_R],
-      ['key_g', COLOR.KEY_G],
-      ['key_b', COLOR.KEY_B],
-    ];
-    for (const [name, color] of keys) {
-      g.fillStyle(color, 1);
-      g.fillCircle(8, 6, 4);
-      g.fillRect(7, 6, 2, 8);
-      g.fillRect(9, 10, 3, 2);
-      g.generateTexture(name, 16, 16);
-      g.clear();
-    }
-
-    // chest
-    g.fillStyle(COLOR.CHEST, 1);
-    g.fillRoundedRect(2, 6, 20, 16, 3);
-    g.lineStyle(2, 0x000000, 1);
-    g.strokeRoundedRect(2, 6, 20, 16, 3);
-    g.fillStyle(0xffd54f, 1);
-    g.fillRect(10, 12, 4, 4);
-    g.generateTexture('chest', 24, 24);
-    g.clear();
-
-    // ammo pickup
-    g.fillStyle(0xfff176, 1);
-    g.fillRect(2, 6, 12, 4);
-    g.fillRect(2, 10, 12, 4);
-    g.generateTexture('pickup_ammo', 16, 16);
-    g.clear();
-
-    g.destroy();
-
-    // Soft circular brush: белый круг с плавным альфа-спадом от 1 в центре
-    // до 0 на радиусе. Используется FogOfWar для:
-    //   1) накопления explored-маски (штампуется в RenderTexture при движении)
-    //   2) текущей vision-маски (image у позиции игрока)
-    // Один и тот же brush для обеих ролей — отличается только применением.
+    // Радиальный кольцевой brush для FogOfWar и (опционально) softCircle
+    // accumulator для memory. Прозрачный в центре, peak alpha у границы,
+    // снова прозрачный за пределами — сглаживает блочную границу зрения.
     const radius = VISION_RADIUS_TILES * TILE_SIZE;
-    const size = radius * 2;
+    const size = radius * 3;
     const cv = document.createElement('canvas');
     cv.width = cv.height = size;
     const cx = cv.getContext('2d');
-    const grad = cx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, radius);
-    grad.addColorStop(0.0, 'rgba(255,255,255,1)');
-    grad.addColorStop(0.6, 'rgba(255,255,255,0.85)');
-    grad.addColorStop(1.0, 'rgba(255,255,255,0)');
+    cx.clearRect(0, 0, size, size);
+    const grad = cx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, radius * 1.05);
+    grad.addColorStop(0.0,  'rgba(0,0,0,0)');
+    grad.addColorStop(0.65, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.92, 'rgba(0,0,0,0.55)');
+    grad.addColorStop(1.0,  'rgba(0,0,0,0)');
     cx.fillStyle = grad;
     cx.fillRect(0, 0, size, size);
-    this.textures.addCanvas('soft_circle', cv);
+    this.textures.addCanvas('vignette', cv);
+
+    // soft_circle — белый круг с alpha-градиентом, используется FogOfWar как
+    // brush для накопительной explored-памяти и mask текущего зрения.
+    const sSize = radius * 2;
+    const sc = document.createElement('canvas');
+    sc.width = sc.height = sSize;
+    const scx = sc.getContext('2d');
+    const sgrad = scx.createRadialGradient(sSize / 2, sSize / 2, 0, sSize / 2, sSize / 2, sSize / 2);
+    sgrad.addColorStop(0.0, 'rgba(255,255,255,1)');
+    sgrad.addColorStop(0.7, 'rgba(255,255,255,1)');
+    sgrad.addColorStop(1.0, 'rgba(255,255,255,0)');
+    scx.fillStyle = sgrad;
+    scx.fillRect(0, 0, sSize, sSize);
+    this.textures.addCanvas('soft_circle', sc);
 
     this.scene.start('MenuScene');
   }
