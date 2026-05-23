@@ -12,13 +12,15 @@ export class Player {
   constructor(scene, x, y) {
     this.scene = scene;
     this.sprite = scene.physics.add.sprite(x, y, 'player');
-    // 0x72-спрайт оригинал ~16×28, рендерим 2x чтобы попасть в TILE_SIZE 32.
-    this.sprite.setScale(2);
-    // circular hitbox plows around corners cleanly; offset так, чтобы тело
-    // оказалось примерно в торсе спрайта, а не в его макушке.
+    // 0x72-спрайт ~16×28, scale 1.5 → display 24×42. Помещается в тайл по
+    // ширине с воздухом, по высоте чуть выше тайла — это «голова», torso
+    // визуально по центру клетки.
+    this.sprite.setScale(1.5);
+    this.sprite.setOrigin(0.5, 0.7);
+    // компактный body-circle, чтобы свободно пролезать в коридорах
     const w = this.sprite.width, h = this.sprite.height;
-    const r = PLAYER_SIZE / 4; // radius в unscaled coords, под scale=2 даёт ~20 px display
-    this.sprite.body.setCircle(r, (w - r * 2) / 2, (h - r * 2) / 2);
+    const r = 5;
+    this.sprite.body.setCircle(r, w / 2 - r, h * 0.7 - r);
     this.hp = PLAYER_MAX_HP;
     this.knockbackUntil = 0;
     this.iframesUntil = 0;
@@ -129,7 +131,11 @@ export class Player {
       speed *= SLOW_MULTIPLIER;
     }
 
-    this.sprite.body.setVelocity(input.move.x * speed, input.move.y * speed);
+    const vx = input.move.x * speed;
+    const vy = input.move.y * speed;
+    this.sprite.body.setVelocity(vx, vy);
+    // flip спрайта по направлению — голова смотрит туда, куда движешься
+    if (Math.abs(vx) > 1) this.sprite.setFlipX(vx < 0);
   }
 
   isDead() {

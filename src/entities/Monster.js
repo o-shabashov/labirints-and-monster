@@ -4,10 +4,11 @@ export class Monster {
   constructor(scene, x, y, texture = 'monster') {
     this.scene = scene;
     this.sprite = scene.physics.add.sprite(x, y, texture);
-    this.sprite.setScale(2);  // ассеты 16×*, рендер 2x
+    this.sprite.setScale(1.5);
+    this.sprite.setOrigin(0.5, 0.7);
     const w = this.sprite.width, h = this.sprite.height;
     const r = 5;
-    this.sprite.body.setCircle(r, (w - r * 2) / 2, (h - r * 2) / 2);
+    this.sprite.body.setCircle(r, w / 2 - r, h * 0.7 - r);
     this.repathTimer = 0;
     this.target = null;          // { x, y } в pixel
     this.speed = 100;
@@ -52,7 +53,11 @@ export class Monster {
       this.sprite.body.setVelocity(0, 0);
       return;
     }
-    this.sprite.body.setVelocity((dx / d) * this.speed, (dy / d) * this.speed);
+    const vx = (dx / d) * this.speed;
+    const vy = (dy / d) * this.speed;
+    this.sprite.body.setVelocity(vx, vy);
+    // flip спрайта по направлению движения; 0x72-арт смотрит вправо в дефолте
+    if (Math.abs(vx) > 1) this.sprite.setFlipX(vx < 0);
   }
 
   update(_dt, _player, _map) {

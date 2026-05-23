@@ -8,11 +8,16 @@ import { GAME_W, CANVAS_H } from './config/constants.js';
 
 const config = {
   type: Phaser.AUTO,
-  width: GAME_W,
-  height: CANVAS_H,
   backgroundColor: '#111418',
   pixelArt: true,
   // Phaser SoundManager сам обработает user-gesture unlock при первом нажатии.
+  // FIT — растягивает canvas пропорционально под окно, без потери aspect.
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: GAME_W,
+    height: CANVAS_H,
+  },
   physics: {
     default: 'arcade',
     arcade: { debug: false },
