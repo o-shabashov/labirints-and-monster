@@ -202,11 +202,18 @@ export function generateMaze(width, height, seed = Date.now()) {
     const tile = doorColors[i];
     for (const c of pick.cells) grid[c.y][c.x] = tile;
     doors.push({ color: keyColors[i], cells: pick.cells.slice() });
-    // ключ — в области, доступной из входа без этой двери
+    // ключ — в области, доступной из входа без этой двери; обязательно
+    // НЕ рядом с ней самой (минимум 5 клеток), иначе подбор обесмысленный.
     const blocked = new Set(pick.cells.map(c => c.y * width + c.x));
     const safe = findReachableExcludingMulti(grid, sx, sy, blocked);
-    if (safe.length > 0) {
-      const cell = safe[Math.floor(rand() * safe.length)];
+    const doorCenter = pick.cells[0];
+    const MIN_KEY_DIST = 5;
+    let far = safe.filter(c =>
+      Math.hypot(c.x - doorCenter.x, c.y - doorCenter.y) >= MIN_KEY_DIST
+    );
+    if (far.length === 0) far = safe;  // fallback на крошечных лабиринтах
+    if (far.length > 0) {
+      const cell = far[Math.floor(rand() * far.length)];
       keys.push({ color: keyColors[i], x: cell.x, y: cell.y });
     }
   }

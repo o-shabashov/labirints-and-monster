@@ -14,6 +14,7 @@ import { Input } from '../systems/Input.js';
 import { Chaser } from '../entities/monsters/Chaser.js';
 import { Wanderer } from '../entities/monsters/Wanderer.js';
 import { Guard } from '../entities/monsters/Guard.js';
+import { Shooter } from '../entities/monsters/Shooter.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
 import { Door } from '../entities/Door.js';
@@ -33,6 +34,7 @@ export class GameScene extends Phaser.Scene {
 
     this.gameState = { effects: [] };
     this.bullets = [];
+    this.enemyProjectiles = [];
     this.lure = null;
     this.lastMoveDir = { x: 1, y: 0 };
     this.lastAimDir = { x: 1, y: 0 };
@@ -74,11 +76,12 @@ export class GameScene extends Phaser.Scene {
           if (Math.hypot(dx, dy) >= minDistTiles) candidates.push({ x, y });
         }
       }
-      // распределение: 4 wanderer, 2 chaser, 1 guard (если есть слоты)
+      // плотнее: 5 wanderer + 3 chaser + 2 guard + 2 shooter = 12.
       const plan = [
-        ...Array(4).fill(Wanderer),
-        ...Array(2).fill(Chaser),
-        ...Array(1).fill(Guard),
+        ...Array(5).fill(Wanderer),
+        ...Array(3).fill(Chaser),
+        ...Array(2).fill(Guard),
+        ...Array(2).fill(Shooter),
       ];
       for (const Cls of plan) {
         if (candidates.length === 0) break;
@@ -107,11 +110,15 @@ export class GameScene extends Phaser.Scene {
 
     this.pickups = [];
     this.chests = [];
-    const deadEnds = findDeadEnds(this.map.tiles);
-    // 3 клетки для аптечек
-    for (let i = 0; i < 3 && deadEnds.length; i++) {
-      const idx = Math.floor(Math.random() * deadEnds.length);
-      const c = deadEnds.splice(idx, 1)[0];
+    // После расширения maze (2×2 комнаты) почти нет «настоящих» dead-ends по
+    // классическому правилу 1-open-side. Берём rooms — это верхние-левые
+    // клетки 2×2 floor-блоков, исключая комнату со входом/выходом и слишком
+    // близкие к ним.
+    const rooms = findRooms(this.map.tiles, this.map.entrance, this.map.exit);
+    // 3 аптечки
+    for (let i = 0; i < 3 && rooms.length; i++) {
+      const idx = Math.floor(Math.random() * rooms.length);
+      const c = rooms.splice(idx, 1)[0];
       const w = this.map.tileToWorld(c.x, c.y);
       const p = new Pickup(this, w.x, w.y, PICKUP_TYPE.HEART);
       this.physics.add.overlap(this.player.sprite, p.sprite, () => {
@@ -122,10 +129,10 @@ export class GameScene extends Phaser.Scene {
       });
       this.pickups.push(p);
     }
-    // 4 клетки для сундуков
-    for (let i = 0; i < 4 && deadEnds.length; i++) {
-      const idx = Math.floor(Math.random() * deadEnds.length);
-      const c = deadEnds.splice(idx, 1)[0];
+    // 4 сундука
+    for (let i = 0; i < 4 && rooms.length; i++) {
+      const idx = Math.floor(Math.random() * rooms.length);
+      const c = rooms.splice(idx, 1)[0];
       const w = this.map.tileToWorld(c.x, c.y);
       const ch = new Chest(this, w.x, w.y);
       this.chests.push(ch);
@@ -227,6 +234,15 @@ export class GameScene extends Phaser.Scene {
     this.bullets = this.bullets.filter(b => !b.dead);
 
     for (const m of this.monsters) m.update(delta, this.player, this.map);
+
+    // вражеские снаряды — летят прямолинейно от Shooter'а
+    for (const p of this.enemyProjectiles) {
+      if (!p.dead && this.time.now >= p.dieAt) {
+        p.dead = true;
+        p.sprite.destroy();
+      }
+    }
+    this.enemyProjectiles = this.enemyProjectiles.filter(p => !p.dead);
 
     // найти сундук в радиусе <1 тайла для подсказки и взаимодействия
     this.nearestChest = null;
@@ -372,6 +388,40 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // Снаряд из вражеского sprite-а к точке (tx, ty) — медленный, без homing.
+  // При коллизии со стеной исчезает; при overlap с игроком наносит 1 урон.
+  spawnEnemyProjectile(sx, sy, tx, ty, speed, lifetimeMs) {
+    const dx = tx - sx, dy = ty - sy;
+    const len = Math.hypot(dx, dy) || 1;
+    const sprite = this.physics.add.sprite(sx, sy, 'bullet');
+    sprite.setTint(0xb388ff);
+    sprite.setScale(1.5);
+    sprite.body.setAllowGravity(false);
+    sprite.body.setCircle(3, sprite.width / 2 - 3, sprite.height / 2 - 3);
+    sprite.body.setVelocity((dx / len) * speed, (dy / len) * speed);
+    const proj = { sprite, dead: false, dieAt: this.time.now + lifetimeMs };
+    this.physics.add.collider(sprite, this.map.walls, () => {
+      if (proj.dead) return;
+      proj.dead = true;
+      sprite.destroy();
+    });
+    this.physics.add.overlap(sprite, this.player.sprite, () => {
+      if (proj.dead) return;
+      proj.dead = true;
+      sprite.destroy();
+      const took = this.player.takeHit(sx, sy);
+      if (took) {
+        this.sound.playerHurt();
+        this.game.events.emit('hud:update', { hp: this.player.hp });
+        if (this.player.isDead()) {
+          this.sound.gameover();
+          this.scene.start('GameOverScene', this.buildSummary());
+        }
+      }
+    });
+    this.enemyProjectiles.push(proj);
+  }
+
   // ближайший монстр в радиусе зрения и без стен на луче от точки выстрела
   findHomingTarget(ox, oy) {
     const visionPxSq = this.fog.currentRadiusPx * this.fog.currentRadiusPx;
@@ -399,9 +449,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   exploredPercent() {
+    // считаем только non-wall клетки внутри explored, иначе vision-радиус
+    // прихватывает соседние WALL и итог переваливает за 100%.
     let n = 0;
-    for (const row of this.fog.explored) for (const v of row) if (v) n++;
-    return Math.round((n / this.stats.totalCells) * 100);
+    for (let y = 0; y < this.fog.explored.length; y++) {
+      for (let x = 0; x < this.fog.explored[0].length; x++) {
+        if (this.fog.explored[y][x] && this.map.tiles[y][x] !== TILE.WALL) n++;
+      }
+    }
+    return Math.min(100, Math.round((n / this.stats.totalCells) * 100));
   }
 
   buildSummary() {
@@ -446,6 +502,30 @@ function findDeadEnds(tiles) {
         if (tiles[y + dy][x + dx] !== TILE.WALL) openSides++;
       }
       if (openSides === 1) result.push({ x, y });
+    }
+  }
+  return result;
+}
+
+// Каждая «комната» — 2×2 floor-блок в узле сетки carve (x=1,4,7,…, y=1,4,7,…).
+// Центр комнаты используем как точку спавна для сундуков/аптечек, кроме
+// клеток рядом с входом и выходом (чтобы стартовая зона не была overstuffed).
+function findRooms(tiles, entrance, exit) {
+  const result = [];
+  const h = tiles.length, w = tiles[0].length;
+  const minDist = 4;
+  for (let ry = 1; ry < h - 2; ry += 3) {
+    for (let rx = 1; rx < w - 2; rx += 3) {
+      // комната живая если все 4 клетки floor
+      if (tiles[ry][rx] !== TILE.FLOOR) continue;
+      if (tiles[ry][rx + 1] !== TILE.FLOOR) continue;
+      if (tiles[ry + 1][rx] !== TILE.FLOOR) continue;
+      if (tiles[ry + 1][rx + 1] !== TILE.FLOOR) continue;
+      // центр комнаты — это серединная клетка (rx+0.5, ry+0.5). Берём (rx, ry).
+      const cx = rx, cy = ry;
+      if (entrance && Math.hypot(cx - entrance.x, cy - entrance.y) < minDist) continue;
+      if (exit && Math.hypot(cx - exit.x, cy - exit.y) < minDist) continue;
+      result.push({ x: cx, y: cy });
     }
   }
   return result;
