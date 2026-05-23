@@ -31,6 +31,7 @@ export class GameScene extends Phaser.Scene {
     this.bullets = [];
     this.lure = null;
     this.lastMoveDir = { x: 1, y: 0 };
+    this.lastAimDir = { x: 1, y: 0 };
 
     const seed = Date.now();
     const { grid, keys: keySpec } = generateMaze(GRID_W, GRID_H, seed);
@@ -161,7 +162,14 @@ export class GameScene extends Phaser.Scene {
     if (input.move.x !== 0 || input.move.y !== 0) {
       this.lastMoveDir = { x: input.move.x, y: input.move.y };
     }
-    this.player.setAim(input.aim);
+    // sticky aim: запоминаем последнее активное направление прицела,
+    // чтобы при отпущенном стике геймпада конус и стрельба не «забывали» цель.
+    if (input.aim) {
+      this.lastAimDir = { x: input.aim.x, y: input.aim.y };
+    } else if (input.move.x !== 0 || input.move.y !== 0) {
+      this.lastAimDir = { x: input.move.x, y: input.move.y };
+    }
+    this.player.setAim(this.lastAimDir);
     this.player.update(input);
 
     // стрельба
@@ -245,7 +253,7 @@ export class GameScene extends Phaser.Scene {
 
     // конус прицела
     this.aimCone.clear();
-    const aimDir = input.aim || this.lastMoveDir;
+    const aimDir = this.lastAimDir;
     if (aimDir && (aimDir.x !== 0 || aimDir.y !== 0)) {
       const px = this.player.sprite.x;
       const py = this.player.sprite.y;
