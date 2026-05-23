@@ -13,12 +13,41 @@ export class Monster {
     this.target = null;          // { x, y } в pixel
     this.speed = 100;
     this.hp = 1;
+    this.baseTint = 0xffffff;    // подклассы могут перезаписать после своего setTint
+    this.dying = false;
   }
 
   takeDamage(n = 1) {
+    if (this.dying) return false;
     this.hp -= n;
-    if (this.hp <= 0) this.sprite.destroy();
-    return this.hp <= 0;
+    if (this.hp > 0) {
+      // мигание удара — белый flash на ~100мс
+      this.sprite.setTintFill(0xffffff);
+      this.scene.time.delayedCall(100, () => {
+        if (this.sprite && this.sprite.active) this.sprite.setTint(this.baseTint);
+      });
+      // лёгкий kickback по scale для feedback
+      this.scene.tweens.add({
+        targets: this.sprite,
+        scaleX: { from: this.sprite.scaleX * 1.3, to: this.sprite.scaleX },
+        scaleY: { from: this.sprite.scaleY * 0.8, to: this.sprite.scaleY },
+        duration: 110,
+      });
+      return false;
+    }
+    // смерть — анимация затухания и спин
+    this.dying = true;
+    this.sprite.body.enable = false;
+    this.scene.tweens.add({
+      targets: this.sprite,
+      alpha: 0,
+      scaleX: this.sprite.scaleX * 0.4,
+      scaleY: this.sprite.scaleY * 0.4,
+      angle: 180,
+      duration: 350,
+      onComplete: () => this.sprite.destroy(),
+    });
+    return true;
   }
 
   tilePos() {

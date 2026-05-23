@@ -60,7 +60,7 @@ export const DASH_STAMINA_COST = 30;  // расход stamina на рывок
 
 export const WANDERER_VISION_TILES = 4;
 export const WANDERER_LOSE_INTEREST_MS = 3000;
-export const GUARD_PATROL_HALF = 1;  // охраняет 3×3 => half=1
+export const GUARD_PATROL_HALF = 3;  // охраняет 7×7 — активируется раньше
 
 export const ARMOR_MAX = 2;
 export const ARMOR_REGEN_DELAY_MS = 8000;

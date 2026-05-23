@@ -14,6 +14,7 @@ export class Shooter extends Monster {
     super(scene, x, y, 'monster_wanderer');
     // Используем спрайт wanderer но с фиолетовым тинтом — чтобы отличался.
     this.sprite.setTint(0x9966ff);
+    this.baseTint = 0x9966ff;
     this.speed = 0;
     this.hp = 1;
     this.nextShotAt = scene.time.now + Math.random() * FIRE_INTERVAL_MS;

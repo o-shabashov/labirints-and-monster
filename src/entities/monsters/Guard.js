@@ -7,7 +7,7 @@ const REPATH_MS = 250;
 export class Guard extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_guard');
-    this.speed = PLAYER_SPEED * 0.5;
+    this.speed = PLAYER_SPEED * 0.4;
     this.homeTile = this.tilePos();
   }
 
