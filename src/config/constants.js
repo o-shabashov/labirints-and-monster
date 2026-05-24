@@ -53,6 +53,7 @@ export const ROCKET_DAMAGE             = 4;     // прямое попадани
 export const ROCKET_AOE_DAMAGE         = 3;     // монстрам в радиусе взрыва
 export const ROCKET_EXPLOSION_RADIUS   = 56;    // визуал + damage сферой
 export const ROCKET_WALL_ERASE_RADIUS  = 36;    // erase стен — крупная дырка
+export const WALL_CHAR_RIM_PX          = 6;     // ширина «обугленной» каймы вокруг дырки
 export const ROCKET_PLAYER_RECOIL      = 220;   // px/sec отдача игрока назад
 export const ROCKET_PLAYER_RECOIL_MS   = 140;   // длительность recoil — на это время Player.update пропускает свой setVelocity
 export const ROCKET_MONSTER_KNOCKBACK  = 360;   // px/sec отброс врагов от центра

@@ -1,7 +1,7 @@
 import {
   TILE_SIZE, GAME_W, GAME_H,
   TILE, isBlockingTile,
-  WALL_SUB, WALL_ERASE_RADIUS_PX,
+  WALL_SUB, WALL_ERASE_RADIUS_PX, WALL_CHAR_RIM_PX,
 } from '../config/constants.js';
 
 const SUB_SIZE = TILE_SIZE / WALL_SUB;  // 4px при WALL_SUB=8
@@ -167,32 +167,54 @@ export class TileMap {
     }
     if (!touched) return false;
 
-    // Brush 32×32 даёт «жёсткий» круг ~16px радиусом при scale=1.
-    // Чтобы визуальная дырка совпадала с обнулёнными sub-cells,
-    // масштабируем пропорционально radiusPx.
-    const brushScale = radiusPx / 14;
-
-    // 1. «Обугленные края» — тёмный stamp рисуется ВНУТРЬ wallsRT с blend
-    //    MULTIPLY. На стенах (alpha>0) тинт умножается → потемнение. Где
-    //    wallsRT уже прозрачен (старая дырка) — alpha остаётся 0, эффекта
-    //    нет. Чуть шире erase radius (×1.6), чтобы кайма выходила за
-    //    будущую дырку. Tint 0x5a5048 — светлее предыдущего (пользователь
-    //    просил «чуть светлее»).
-    const charStamp = this.scene.add.image(worldX, worldY, 'wall_damage_brush')
+    // 1. Обугленная кайма — hard-edge brush, чуть шире erase радиуса
+    //    (фиксированная ширина WALL_CHAR_RIM_PX). Multiply blend: src.rgb *
+    //    dst.rgb, src.alpha=1 → dst.alpha не меняется (стена остаётся
+    //    непрозрачной, не становится «полупрозрачной»). На прозрачных
+    //    участках wallsRT (старые дырки) dst.rgb=0 → final.rgb=0 но
+    //    dst.alpha=0 → результат всё ещё прозрачный. Кайма видна только на
+    //    оставшихся стенах.
+    const charScale = (radiusPx + WALL_CHAR_RIM_PX) / 16;  // hard brush радиус 16
+    const charStamp = this.scene.add.image(worldX, worldY, 'wall_char_brush')
       .setOrigin(0.5)
-      .setScale(brushScale * 1.6)
-      .setTint(0x5a5048);
+      .setScale(charScale)
+      .setTint(0x6a5f50);
     charStamp.setBlendMode(Phaser.BlendModes.MULTIPLY);
     this.wallsRT.draw(charStamp);
     charStamp.destroy();
 
-    // 2. Erase — вырезаем центральную дырку поверх затемнения.
+    // 2. Erase — soft brush (gradient) вырезает мягкий центр поверх каймы.
+    //    brushScale = radiusPx / 14 — соответствует обнулённой sub-area.
+    const eraseScale = radiusPx / 14;
     const eraseImg = this.scene.add.image(worldX, worldY, 'wall_damage_brush')
       .setOrigin(0.5)
-      .setScale(brushScale)
+      .setScale(eraseScale)
       .setVisible(false);
     this.wallsRT.erase(eraseImg);
     eraseImg.destroy();
+
+    // 3. Анимированные огоньки по периметру дырки — 6-8 sprite'ов
+    //    explosion_particle с оранжевым тинтом, fade'ятся 700-1300ms.
+    //    Создают эффект тлеющих углей сразу после взрыва.
+    const sparkCount = 6 + Math.floor(Math.random() * 3);
+    const sparkRadius = radiusPx + WALL_CHAR_RIM_PX * 0.5;
+    for (let i = 0; i < sparkCount; i++) {
+      const ang = (Math.PI * 2 * i) / sparkCount + Math.random() * 0.6;
+      const sx = worldX + Math.cos(ang) * (sparkRadius + (Math.random() - 0.5) * 4);
+      const sy = worldY + Math.sin(ang) * (sparkRadius + (Math.random() - 0.5) * 4);
+      const sp = this.scene.add.image(sx, sy, 'explosion_particle')
+        .setDepth(2.2)
+        .setScale(0.5 + Math.random() * 0.4)
+        .setTint(0xffaa44);
+      this.scene.tweens.add({
+        targets: sp,
+        alpha: { from: 1, to: 0 },
+        scale: { from: 1.0, to: 0.3 },
+        duration: 700 + Math.random() * 600,
+        ease: 'Sine.easeOut',
+        onComplete: () => sp.destroy(),
+      });
+    }
 
     // SOLID_WALL клетки в радиусе erase'а — перерисовываем поверх, чтобы их
     // не «обкусило» кружком. Обычно 0–2 клеток в bbox.

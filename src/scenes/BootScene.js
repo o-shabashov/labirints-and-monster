@@ -200,6 +200,20 @@ export class BootScene extends Phaser.Scene {
     epx.fillRect(0, 0, epSize, epSize);
     this.textures.addCanvas('explosion_particle', epCv);
 
+    // Hard-edge brush для затемнения каймы вокруг дырки. Сплошной белый
+    // круг с alpha=1 внутри радиуса 16, alpha=0 снаружи. Sharp edge нужен
+    // чтобы при MULTIPLY blend alpha не «съедала» альфу стены — иначе
+    // стена становится полупрозрачной. С hard edge alpha=1*1=1.
+    const wcSize = 32;
+    const wcCv = document.createElement('canvas');
+    wcCv.width = wcCv.height = wcSize;
+    const wcx = wcCv.getContext('2d');
+    wcx.fillStyle = 'rgba(255,255,255,1)';
+    wcx.beginPath();
+    wcx.arc(wcSize / 2, wcSize / 2, wcSize / 2, 0, Math.PI * 2);
+    wcx.fill();
+    this.textures.addCanvas('wall_char_brush', wcCv);
+
     // Brush для erase'а стен от попаданий пуль — soft circle ~24px с резким
     // центром (alpha 1) и плавным схождением к 0. Радиус совпадает с
     // WALL_ERASE_RADIUS_PX (constants.js). Маленький размер — чтобы дырки были
