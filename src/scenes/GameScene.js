@@ -7,6 +7,7 @@ import {
   BOMB_AMMO_FROM_PICKUP, BOMB_EXPLOSION_RADIUS, BOMB_WALL_ERASE_RADIUS,
   BOMB_AOE_DAMAGE, BOMB_MONSTER_KNOCKBACK,
   CAMERA_SHAKE_MS, CAMERA_SHAKE_INTENSITY,
+  MAX_LEVELS, MOBS_PER_LEVEL_BONUS,
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
   COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES,
@@ -49,6 +50,13 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
+  init(data) {
+    // data приходит из scene.start('GameScene', { level, carry }) при переходе
+    // на следующий уровень. На первом запуске data пустая.
+    this.currentLevel = (data && data.level) || 1;
+    this._carry = (data && data.carry) || null;
+  }
+
   create() {
     // мир рендерится ПОД топ-баром, чтобы HUD не накрывал лабиринт
     this.cameras.main.setViewport(0, TOPBAR_H, GAME_W, GAME_H);
@@ -83,14 +91,27 @@ export class GameScene extends Phaser.Scene {
       this.player.hasRocketLauncher = true;
       console.log('[DEBUG] rocket launcher granted at spawn');
     }
+    // Перенос состояния с прошлого уровня: HP, armor, прокачка, инвентарь
+    // (кроме ключей — двери и ключи генерятся новые). nextRocketAt
+    // обнуляется, чтоб ракета сразу была готова после транзита.
+    if (this._carry) {
+      const c = this._carry;
+      this.player.hp = c.hp ?? this.player.hp;
+      this.player.armor = c.armor ?? 0;
+      this.player.shieldCharges = c.shieldCharges ?? 0;
+      this.player.weaponLevel = c.weaponLevel ?? 1;
+      this.player.weaponXp = c.weaponXp ?? 0;
+      this.player.hasRocketLauncher = c.hasRocketLauncher || this.player.hasRocketLauncher;
+      this.player.bombsAmmo = c.bombsAmmo ?? 0;
+      this.player.nextRocketAt = 0;
+      log('level', 'carry applied', c);
+    }
+    log('level', 'started', { level: this.currentLevel });
 
     const exitPos = this.map.tileToWorld(this.map.exit.x, this.map.exit.y);
     this.exitZone = this.add.zone(exitPos.x, exitPos.y, TILE_SIZE, TILE_SIZE);
     this.physics.add.existing(this.exitZone, true);
-    this.physics.add.overlap(this.player.sprite, this.exitZone, () => {
-      this.sound.victory();
-      this.scene.start('VictoryScene', this.buildSummary());
-    });
+    this.physics.add.overlap(this.player.sprite, this.exitZone, () => this._onReachExit());
 
     this.inputSys = new Input(this);
 
@@ -106,8 +127,9 @@ export class GameScene extends Phaser.Scene {
           if (Math.hypot(dx, dy) >= minDistTiles) candidates.push({ x, y });
         }
       }
-      // Зоопарк: смесь всех 10 типов, ~25 монстров на старте (на треть меньше
-      // прежних 37 — тестирование показало что было перебор).
+      // Зоопарк: смесь всех 10 типов, ~25 монстров на старте.
+      // На каждый последующий уровень — +MOBS_PER_LEVEL_BONUS дополнительных
+      // монстров (распределяются среди Chaser/Wanderer/Goblin для динамики).
       const plan = [
         ...Array(5).fill(Wanderer),
         ...Array(3).fill(Chaser),
@@ -120,6 +142,11 @@ export class GameScene extends Phaser.Scene {
         ...Array(2).fill(TinyZombie),
         ...Array(2).fill(MaskedOrc),
       ];
+      const levelBonus = (this.currentLevel - 1) * MOBS_PER_LEVEL_BONUS;
+      const bonusPool = [Chaser, Wanderer, Goblin, OrcWarrior];
+      for (let i = 0; i < levelBonus; i++) {
+        plan.push(bonusPool[i % bonusPool.length]);
+      }
       for (const Cls of plan) {
         if (candidates.length === 0) break;
         const idx = Math.floor(Math.random() * candidates.length);
@@ -567,6 +594,8 @@ export class GameScene extends Phaser.Scene {
           : 0,
       },
       bombs: this.player.bombsAmmo || 0,
+      level: this.currentLevel,
+      maxLevel: MAX_LEVELS,
     });
   }
 
@@ -926,6 +955,33 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.sound.explosion();
+  }
+
+  // Игрок дошёл до exit — следующий уровень или финальная Victory.
+  _onReachExit() {
+    if (this._reachingExit) return;   // защита от двойного срабатывания
+    this._reachingExit = true;
+    const next = this.currentLevel + 1;
+    log('level', 'exit reached', { current: this.currentLevel, next, max: MAX_LEVELS });
+    if (next > MAX_LEVELS) {
+      this.sound.victory();
+      this.scene.start('VictoryScene', this.buildSummary());
+      return;
+    }
+    this.sound.pickup();
+    this.showToast?.(`Уровень ${next}`, '#ffeb3b');
+    this.scene.start('GameScene', {
+      level: next,
+      carry: {
+        hp:                this.player.hp,
+        armor:             this.player.armor,
+        shieldCharges:     this.player.shieldCharges,
+        weaponLevel:       this.player.weaponLevel,
+        weaponXp:          this.player.weaponXp,
+        hasRocketLauncher: this.player.hasRocketLauncher,
+        bombsAmmo:         this.player.bombsAmmo,
+      },
+    });
   }
 
   // Взрыв бомбы — те же эффекты, но крупнее радиус и сильнее knockback.

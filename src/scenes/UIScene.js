@@ -34,6 +34,11 @@ export class UIScene extends Phaser.Scene {
     this.weaponBarBg = this.add.rectangle(260, 22, 90, 4, 0x333333).setOrigin(0, 0);
     this.weaponBar   = this.add.rectangle(260, 22, 0,  4, 0xfff59d).setOrigin(0, 0);
 
+    // Уровень (level прогрессии) — справа сверху, над device-индикатором.
+    this.levelLabel = this.add.text(GAME_W - 12, 6, '', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#ffd54f',
+    }).setOrigin(1, 0);
+
     // tier монстров — справа отдельный блок
     this.mobLabel = this.add.text(GAME_W - 12, 28, '', {
       fontFamily: 'monospace', fontSize: '13px', color: '#ff8a65',
@@ -60,8 +65,9 @@ export class UIScene extends Phaser.Scene {
     this.bombIcon.setVisible(false);
     // живые иконки ключей — спрайты flask_*. Заполняются в onUpdate.
     this.keyIcons = [];
-    this.deviceIndicator = this.add.text(GAME_W - 12, 6, '', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#888888',
+    // device-индикатор — под level
+    this.deviceIndicator = this.add.text(GAME_W - 12, 44, '', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#888888',
     }).setOrigin(1, 0);
 
     // ряд 2 (y=28): stamina-бар и эффекты + interactHint по центру
@@ -130,6 +136,10 @@ export class UIScene extends Phaser.Scene {
     if (state.mobTier != null) {
       this.mobLabel.setText(`Монстры ур.${state.mobTier}`);
       this.mobBar.width = 90 * (state.mobTierFraction ?? 0);
+    }
+    if (state.level != null) {
+      const max = state.maxLevel || '?';
+      this.levelLabel.setText(`Уровень ${state.level}/${max}`);
     }
     if (state.bombs != null) {
       const n = state.bombs;

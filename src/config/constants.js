@@ -68,6 +68,12 @@ export const BOMB_DAMAGE               = 5;
 export const BOMB_AOE_DAMAGE           = 4;
 export const BOMB_MONSTER_KNOCKBACK    = 480;
 export const BOMB_AMMO_FROM_PICKUP     = 3;     // одна pickup-сумка = 3 бомбы
+
+// Прогрессия уровней — exit ведёт на следующий level, не на Victory,
+// пока не пройдёшь MAX_LEVELS. Каждый level: +2 монстра к базе,
+// monster-tier offset +1 (стартовая величина агрессии).
+export const MAX_LEVELS                = 5;
+export const MOBS_PER_LEVEL_BONUS      = 2;
 export const ROCKET_MONSTER_KNOCKBACK  = 360;   // px/sec отброс врагов от центра
 export const CAMERA_SHAKE_MS           = 220;
 export const CAMERA_SHAKE_INTENSITY    = 0.012;
