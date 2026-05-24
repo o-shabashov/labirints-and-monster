@@ -129,6 +129,20 @@ export class BootScene extends Phaser.Scene {
     cx.fillRect(0, 0, size, size);
     this.textures.addCanvas('vignette', cv);
 
+    // Дым 20×20 — soft радиальный круг серого цвета, alpha=1 в центре,
+    // 0 на краю. Используется как пуф за ракетой.
+    const smSize = 20;
+    const smCv = document.createElement('canvas');
+    smCv.width = smCv.height = smSize;
+    const smx = smCv.getContext('2d');
+    const smgrad = smx.createRadialGradient(smSize/2, smSize/2, 0, smSize/2, smSize/2, smSize/2);
+    smgrad.addColorStop(0.0, 'rgba(180,180,180,1)');
+    smgrad.addColorStop(0.6, 'rgba(120,120,120,0.6)');
+    smgrad.addColorStop(1.0, 'rgba(80,80,80,0)');
+    smx.fillStyle = smgrad;
+    smx.fillRect(0, 0, smSize, smSize);
+    this.textures.addCanvas('smoke_particle', smCv);
+
     // Однотонный пол 32×32 — без бордер, лёгкий шум чтоб не казался
     // плоской заливкой. Цвет — приглушённый коричневый, ровно по всей
     // площади (не граничит как 0x72 floor_1).

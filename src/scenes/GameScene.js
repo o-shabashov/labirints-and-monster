@@ -352,7 +352,7 @@ export class GameScene extends Phaser.Scene {
           });
         }
         this.rockets.push(r);
-        this.sound.shoot();
+        this.sound.rocketShoot();
       }
     }
 
@@ -853,7 +853,7 @@ export class GameScene extends Phaser.Scene {
         this.monsters = this.monsters.filter(x => x !== m);
       }
     }
-    this.sound.hit();
+    this.sound.explosion();
   }
 
   throwLure() {
