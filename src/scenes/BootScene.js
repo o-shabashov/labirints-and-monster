@@ -143,21 +143,23 @@ export class BootScene extends Phaser.Scene {
     smx.fillRect(0, 0, smSize, smSize);
     this.textures.addCanvas('smoke_particle', smCv);
 
-    // Однотонный пол 32×32 — без бордер, лёгкий шум чтоб не казался
-    // плоской заливкой. Цвет — приглушённый коричневый, ровно по всей
-    // площади (не граничит как 0x72 floor_1).
+    // Однотонный пол 32×32 — без бордер, лёгкий шум. Делаем заметно
+    // ТЕМНЕЕ стен (wall_mid имеет средний серо-коричневый brightness),
+    // чтобы дырка от ракеты сразу читалась как «провал» поверх стены,
+    // а не сливалась с ней. Прошлый #3a302a совпадал по тону со стеной
+    // и пользователь не видел разрушения.
     const flSize = 32;
     const flCv = document.createElement('canvas');
     flCv.width = flCv.height = flSize;
     const flx = flCv.getContext('2d');
-    flx.fillStyle = '#3a302a';
+    flx.fillStyle = '#15110d';
     flx.fillRect(0, 0, flSize, flSize);
     for (let i = 0; i < 70; i++) {
       const xx = Math.floor(Math.random() * flSize);
       const yy = Math.floor(Math.random() * flSize);
       const a = 0.06 + Math.random() * 0.10;
-      const v = 50 + Math.floor(Math.random() * 30);
-      flx.fillStyle = `rgba(${v},${v - 6},${v - 12},${a})`;
+      const v = 32 + Math.floor(Math.random() * 24);
+      flx.fillStyle = `rgba(${v},${v - 4},${v - 8},${a})`;
       flx.fillRect(xx, yy, 1, 1);
     }
     this.textures.addCanvas('floor_plain', flCv);
