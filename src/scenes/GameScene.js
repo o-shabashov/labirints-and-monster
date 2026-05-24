@@ -1,6 +1,9 @@
 import {
   TILE, TILE_SIZE, GRID_W, GRID_H, GAME_W, GAME_H, TOPBAR_H, VISION_RADIUS_TILES,
   isBlockingTile, BULLET_DESTROYS_WALLS,
+  ROCKET_DAMAGE, ROCKET_AOE_DAMAGE, ROCKET_EXPLOSION_RADIUS,
+  ROCKET_WALL_ERASE_RADIUS, ROCKET_MONSTER_KNOCKBACK,
+  CAMERA_SHAKE_MS, CAMERA_SHAKE_INTENSITY,
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
   COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES,
@@ -30,6 +33,7 @@ import { TinyZombie } from '../entities/monsters/TinyZombie.js';
 import { MaskedOrc } from '../entities/monsters/MaskedOrc.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
+import { Rocket } from '../entities/Rocket.js';
 import { Door } from '../entities/Door.js';
 import { Chest } from '../entities/Chest.js';
 import { addEffect, hasEffect, tickEffects } from '../systems/Effects.js';
@@ -47,6 +51,7 @@ export class GameScene extends Phaser.Scene {
 
     this.gameState = { effects: [] };
     this.bullets = [];
+    this.rockets = [];
     this.enemyProjectiles = [];
     this.lure = null;
     this.lastMoveDir = { x: 1, y: 0 };
@@ -122,6 +127,36 @@ export class GameScene extends Phaser.Scene {
 
     this.pickups = [];
     this.chests = [];
+
+    // Ракетница — стартовый pickup в 2-3 тайлах от entrance.
+    // Игрок видит её сразу при появлении.
+    {
+      const ent = this.map.entrance;
+      const candidates = [];
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          const d = Math.hypot(dx, dy);
+          if (d < 1.5 || d > 3.5) continue;
+          const tx = ent.x + dx, ty = ent.y + dy;
+          if (tx < 1 || ty < 1 || tx >= GRID_W - 1 || ty >= GRID_H - 1) continue;
+          if (this.map.tiles[ty][tx] === TILE.FLOOR) candidates.push({ x: tx, y: ty });
+        }
+      }
+      if (candidates.length) {
+        const c = candidates[Math.floor(Math.random() * candidates.length)];
+        const w = this.map.tileToWorld(c.x, c.y);
+        const rp = new Pickup(this, w.x, w.y, PICKUP_TYPE.ROCKET_LAUNCHER);
+        this.physics.add.overlap(this.player.sprite, rp.sprite, () => {
+          if (!rp.sprite.active) return;
+          rp.sprite.destroy();
+          this.player.hasRocketLauncher = true;
+          this.sound.pickup();
+          this.showToast?.('Ракетница! ПКМ / Q', '#ff7043');
+        });
+        this.pickups.push(rp);
+      }
+    }
+
     // После расширения maze (2×2 комнаты) почти нет «настоящих» dead-ends по
     // классическому правилу 1-open-side. Берём rooms — это верхние-левые
     // клетки 2×2 floor-блоков, исключая комнату со входом/выходом и слишком
@@ -279,12 +314,51 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // Ракета — edge-кнопка (одиночный выстрел на нажатие, не auto-fire)
+    if (input.rocket) {
+      const shot = this.player.tryShootRocket(this.time.now);
+      if (shot) {
+        const r = new Rocket(this, shot.ox, shot.oy, shot.x, shot.y);
+        r.sprite.setDepth(4);
+        const trigger = () => {
+          if (r.dead) return;
+          const ex = r.sprite.x, ey = r.sprite.y;
+          this.explode(ex, ey);
+          r.kill();
+        };
+        this.physics.add.collider(r.sprite, this.map.walls, trigger);
+        for (const m of this.monsters) {
+          if (!m.sprite.active) continue;
+          this.physics.add.overlap(r.sprite, m.sprite, () => {
+            if (r.dead || !m.sprite.active) return;
+            // прямое попадание — damage + взрыв (AoE добавит ещё)
+            const hitX = r.sprite.x, hitY = r.sprite.y;
+            if (m.takeDamage(ROCKET_DAMAGE, hitX, hitY)) {
+              this.sound.monsterKilled();
+              this.stats.monstersKilled++;
+              this.player.addWeaponXp();
+              this.monsters = this.monsters.filter(x => x !== m);
+            }
+            this.explode(hitX, hitY);
+            r.kill();
+          });
+        }
+        this.rockets.push(r);
+        this.sound.shoot();
+      }
+    }
+
     // bullet lifetime + homing turn — пропускаем мёртвых, их sprite уничтожен
     const now = this.time.now;
     for (const b of this.bullets) {
       if (!b.dead) b.update(now, delta);
     }
     this.bullets = this.bullets.filter(b => !b.dead);
+
+    for (const r of this.rockets) {
+      if (!r.dead) r.update(now);
+    }
+    this.rockets = this.rockets.filter(r => !r.dead);
 
     for (const m of this.monsters) m.update(delta, this.player, this.map);
     this.tickSpawns();
@@ -685,6 +759,67 @@ export class GameScene extends Phaser.Scene {
       killed: this.stats.monstersKilled,
       explored: this.exploredPercent(),
     };
+  }
+
+  // Взрыв ракеты в (x,y): тряска камеры, частицы, AoE damage+knockback
+  // монстрам, разрушение стен в большом радиусе.
+  explode(worldX, worldY) {
+    this.cameras.main.shake(CAMERA_SHAKE_MS, CAMERA_SHAKE_INTENSITY);
+    this.map.damageAt(worldX, worldY, ROCKET_WALL_ERASE_RADIUS);
+
+    // Частицы — 12 кругов explosion_particle разлетаются и затухают.
+    for (let i = 0; i < 12; i++) {
+      const ang = (Math.PI * 2 * i) / 12 + Math.random() * 0.4;
+      const dist = 12 + Math.random() * (ROCKET_EXPLOSION_RADIUS - 12);
+      const tx = worldX + Math.cos(ang) * dist;
+      const ty = worldY + Math.sin(ang) * dist;
+      const p = this.add.image(worldX, worldY, 'explosion_particle')
+        .setDepth(6)
+        .setScale(0.6 + Math.random() * 0.5);
+      this.tweens.add({
+        targets: p,
+        x: tx, y: ty,
+        alpha: { from: 1, to: 0 },
+        scale: { from: 1.6, to: 0.2 },
+        duration: 360 + Math.random() * 160,
+        ease: 'Cubic.easeOut',
+        onComplete: () => p.destroy(),
+      });
+    }
+    // центральная вспышка — большой однократный flash
+    const flash = this.add.image(worldX, worldY, 'explosion_particle')
+      .setDepth(6).setScale(0.4);
+    this.tweens.add({
+      targets: flash,
+      scale: { from: 0.6, to: 4 },
+      alpha: { from: 1, to: 0 },
+      duration: 280,
+      ease: 'Cubic.easeOut',
+      onComplete: () => flash.destroy(),
+    });
+
+    // AoE damage + knockback монстрам в радиусе
+    const r2 = ROCKET_EXPLOSION_RADIUS * ROCKET_EXPLOSION_RADIUS;
+    for (const m of this.monsters.slice()) {
+      if (!m.sprite || !m.sprite.active) continue;
+      const dx = m.sprite.x - worldX, dy = m.sprite.y - worldY;
+      if (dx * dx + dy * dy > r2) continue;
+      const dist = Math.hypot(dx, dy) || 1;
+      // knockback наружу
+      if (m.sprite.body) {
+        m.sprite.body.setVelocity(
+          (dx / dist) * ROCKET_MONSTER_KNOCKBACK,
+          (dy / dist) * ROCKET_MONSTER_KNOCKBACK,
+        );
+      }
+      if (m.takeDamage(ROCKET_AOE_DAMAGE, worldX, worldY)) {
+        this.sound.monsterKilled();
+        this.stats.monstersKilled++;
+        this.player.addWeaponXp();
+        this.monsters = this.monsters.filter(x => x !== m);
+      }
+    }
+    this.sound.hit();
   }
 
   throwLure() {

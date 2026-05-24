@@ -1,17 +1,19 @@
 export const PICKUP_TYPE = {
-  HEART: 'heart',
-  KEY_R: 'key_r',
-  KEY_G: 'key_g',
-  KEY_B: 'key_b',
-  AMMO:  'ammo',
+  HEART:           'heart',
+  KEY_R:           'key_r',
+  KEY_G:           'key_g',
+  KEY_B:           'key_b',
+  AMMO:            'ammo',
+  ROCKET_LAUNCHER: 'rocket_launcher',
 };
 
 const TEXTURES = {
-  heart: 'pickup_heart',
-  key_r: 'key_r',
-  key_g: 'key_g',
-  key_b: 'key_b',
-  ammo:  'pickup_ammo',
+  heart:           'pickup_heart',
+  key_r:           'key_r',
+  key_g:           'key_g',
+  key_b:           'key_b',
+  ammo:            'pickup_ammo',
+  rocket_launcher: 'pickup_rocket',
 };
 
 export class Pickup {

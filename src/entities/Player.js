@@ -5,6 +5,7 @@ import {
   ARMOR_MAX, ARMOR_REGEN_DELAY_MS, SLOW_MULTIPLIER,
   SPEED_BOOST_MULTIPLIER, RAPID_FIRE_FACTOR, DAMAGE_BOOST_BONUS,
   WEAPON_XP_PER_LEVEL, WEAPON_MAX_LEVEL,
+  ROCKET_COOLDOWN_MS, ROCKET_PLAYER_RECOIL, ROCKET_PLAYER_RECOIL_MS,
 } from '../config/constants.js';
 import { applyKnockback, KNOCKBACK_DURATION, INVULNERABILITY_DURATION } from '../systems/Combat.js';
 import { hasEffect } from '../systems/Effects.js';
@@ -39,6 +40,8 @@ export class Player {
     this.shieldCharges = 0;
     this.weaponLevel = 1;
     this.weaponXp = 0;
+    this.hasRocketLauncher = false;
+    this.nextRocketAt = 0;
   }
 
   upgradeWeapon() {
@@ -80,6 +83,22 @@ export class Player {
       interval *= RAPID_FIRE_FACTOR;
     }
     this.nextShotAt = now + interval;
+    return { x: this.aim.x, y: this.aim.y, ox: this.sprite.x, oy: this.sprite.y };
+  }
+
+  // Ракета: только при наличии pickup'а; отдельный медленный cooldown;
+  // отдача — толкаем игрока противоположно направлению выстрела.
+  tryShootRocket(now) {
+    if (!this.hasRocketLauncher) return null;
+    if (!this.aim) return null;
+    if (now < this.nextRocketAt) return null;
+    this.nextRocketAt = now + ROCKET_COOLDOWN_MS;
+    // Recoil — короткий толчок назад. knockbackUntil заставит Player.update
+    // не перетирать velocity input'ом движения, иначе отдача гаснет за кадр.
+    if (this.sprite && this.sprite.body) {
+      this.sprite.body.setVelocity(-this.aim.x * ROCKET_PLAYER_RECOIL, -this.aim.y * ROCKET_PLAYER_RECOIL);
+      this.knockbackUntil = Math.max(this.knockbackUntil, now + ROCKET_PLAYER_RECOIL_MS);
+    }
     return { x: this.aim.x, y: this.aim.y, ox: this.sprite.x, oy: this.sprite.y };
   }
 

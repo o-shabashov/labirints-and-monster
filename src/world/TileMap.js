@@ -2,6 +2,7 @@ import {
   TILE_SIZE, GAME_W, GAME_H,
   TILE, isBlockingTile,
   WALL_SUB, WALL_ERASE_RADIUS_PX,
+  FLOOR_TINT, FLOOR_BURNT_TINT,
 } from '../config/constants.js';
 
 const SUB_SIZE = TILE_SIZE / WALL_SUB;  // 8px при WALL_SUB=4
@@ -43,17 +44,20 @@ export class TileMap {
   _renderFloor() {
     this.entrance = null;
     this.exit = null;
+    // burntTiles — track «обугленный» floor sprite в каждой разрушенной клетке,
+    // чтобы не плодить дубли при многократных попаданиях в один tile.
+    this._burntTiles = new Map();   // key: ty*width+tx → sprite
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const px = x * TILE_SIZE + TILE_SIZE / 2;
         const py = y * TILE_SIZE + TILE_SIZE / 2;
-        this.scene.add.image(px, py, 'floor').setScale(2);
+        this.scene.add.image(px, py, 'floor').setScale(2).setTint(FLOOR_TINT).setDepth(0);
         const t = this.tiles[y][x];
         if (t === TILE.ENTRANCE) {
-          this.scene.add.image(px, py, 'entrance').setScale(2);
+          this.scene.add.image(px, py, 'entrance').setScale(2).setDepth(0);
           this.entrance = { x, y };
         } else if (t === TILE.EXIT) {
-          this.scene.add.image(px, py, 'exit').setScale(2);
+          this.scene.add.image(px, py, 'exit').setScale(2).setDepth(0);
           this.exit = { x, y };
         }
       }
@@ -64,7 +68,8 @@ export class TileMap {
     // Единый RenderTexture для всех стен. Erase soft_circle при попадании
     // пули → пиксельные дырки. NEAREST filter, чтобы pixel-art tile-текстура
     // не размывалась при transient scale операциях RT.
-    this.wallsRT = this.scene.add.renderTexture(0, 0, GAME_W, GAME_H).setOrigin(0, 0);
+    // depth=2 → выше burnt-floor (depth=1) и базового floor (depth=0).
+    this.wallsRT = this.scene.add.renderTexture(0, 0, GAME_W, GAME_H).setOrigin(0, 0).setDepth(2);
     if (this.wallsRT.texture && this.wallsRT.texture.setFilter) {
       this.wallsRT.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
     }
@@ -191,11 +196,26 @@ export class TileMap {
       const tx = key % this.width;
       if (this._isTileFullyEmpty(tx, ty) && this.tiles[ty][tx] === TILE.WALL) {
         this.tiles[ty][tx] = TILE.FLOOR;
+        this._stampBurntFloor(tx, ty);
+      } else if (this.tiles[ty][tx] === TILE.WALL && !this._burntTiles.has(key)) {
+        // Частично разрушенный wall — тоже подкладываем тёмный пол, чтобы
+        // через дырку в стене виднелся обугленный оттенок, а не светлый floor.
+        this._stampBurntFloor(tx, ty);
       }
     }
 
     this._rebuildPhysics();
     return true;
+  }
+
+  _stampBurntFloor(tx, ty) {
+    const key = ty * this.width + tx;
+    if (this._burntTiles.has(key)) return;
+    const px = tx * TILE_SIZE + TILE_SIZE / 2;
+    const py = ty * TILE_SIZE + TILE_SIZE / 2;
+    // depth=1: над базовым floor (0), под wallsRT (2). Видим только в дырках.
+    const spr = this.scene.add.image(px, py, 'floor').setScale(2).setTint(FLOOR_BURNT_TINT).setDepth(1);
+    this._burntTiles.set(key, spr);
   }
 
   _isTileFullyEmpty(tx, ty) {

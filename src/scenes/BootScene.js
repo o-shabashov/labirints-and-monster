@@ -129,6 +129,58 @@ export class BootScene extends Phaser.Scene {
     cx.fillRect(0, 0, size, size);
     this.textures.addCanvas('vignette', cv);
 
+    // Ракета — продолговатая 24×10 капля: серый корпус, оранжевый нос,
+    // тонкая жёлтая полоса. Спрайт ориентирован «вправо» (поворачивается
+    // через setRotation на лету).
+    const rkW = 24, rkH = 10;
+    const rkCv = document.createElement('canvas');
+    rkCv.width = rkW; rkCv.height = rkH;
+    const rkx = rkCv.getContext('2d');
+    rkx.fillStyle = '#9e9e9e';
+    rkx.beginPath();
+    rkx.moveTo(0, 2); rkx.lineTo(18, 2); rkx.lineTo(22, rkH/2); rkx.lineTo(18, rkH-2); rkx.lineTo(0, rkH-2);
+    rkx.closePath(); rkx.fill();
+    rkx.fillStyle = '#ff7043';
+    rkx.beginPath();
+    rkx.moveTo(16, 2); rkx.lineTo(20, rkH/2); rkx.lineTo(16, rkH-2);
+    rkx.closePath(); rkx.fill();
+    rkx.fillStyle = '#ffeb3b';
+    rkx.fillRect(2, rkH/2 - 1, 12, 2);
+    // мини-хвост
+    rkx.fillStyle = '#fff59d';
+    rkx.beginPath();
+    rkx.moveTo(0, rkH/2); rkx.lineTo(-4, rkH/2 - 2); rkx.lineTo(-4, rkH/2 + 2);
+    rkx.closePath(); rkx.fill();
+    this.textures.addCanvas('rocket', rkCv);
+
+    // Иконка ракетницы (pickup) — короткая трубка с орудийным «срезом».
+    const plW = 28, plH = 16;
+    const plCv = document.createElement('canvas');
+    plCv.width = plW; plCv.height = plH;
+    const plx = plCv.getContext('2d');
+    plx.fillStyle = '#37474f';
+    plx.fillRect(4, 5, 20, 6);
+    plx.fillStyle = '#546e7a';
+    plx.fillRect(2, 4, 4, 8);   // rear grip
+    plx.fillStyle = '#263238';
+    plx.fillRect(22, 3, 2, 10);  // muzzle ring
+    plx.fillStyle = '#ff7043';
+    plx.fillRect(24, 6, 4, 4);   // muzzle flash hint
+    this.textures.addCanvas('pickup_rocket', plCv);
+
+    // Частица взрыва — маленький радиальный круг с горячим центром.
+    const epSize = 12;
+    const epCv = document.createElement('canvas');
+    epCv.width = epCv.height = epSize;
+    const epx = epCv.getContext('2d');
+    const epg = epx.createRadialGradient(epSize/2, epSize/2, 0, epSize/2, epSize/2, epSize/2);
+    epg.addColorStop(0.0, 'rgba(255,255,200,1)');
+    epg.addColorStop(0.4, 'rgba(255,150,30,1)');
+    epg.addColorStop(1.0, 'rgba(220,40,0,0)');
+    epx.fillStyle = epg;
+    epx.fillRect(0, 0, epSize, epSize);
+    this.textures.addCanvas('explosion_particle', epCv);
+
     // Brush для erase'а стен от попаданий пуль — soft circle ~24px с резким
     // центром (alpha 1) и плавным схождением к 0. Радиус совпадает с
     // WALL_ERASE_RADIUS_PX (constants.js). Маленький размер — чтобы дырки были

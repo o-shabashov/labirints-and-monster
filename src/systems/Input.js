@@ -17,11 +17,13 @@ const STICK_DEADZONE_AIM = 0.20;
 export class Input {
   constructor(scene) {
     this.scene = scene;
-    this.keys = scene.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SHIFT,SPACE,E,ESC');
+    this.keys = scene.input.keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SHIFT,SPACE,E,ESC,Q');
     this.mouse = scene.input.activePointer;
+    // браузерное контекстное меню по RMB мешает целиться/стрелять ракетой
+    scene.input.mouse.disableContextMenu();
 
     this.prev = {
-      dash: false, interact: false, pause: false, shootEdge: false,
+      dash: false, interact: false, pause: false, shootEdge: false, rocket: false,
     };
     this.activeDevice = 'keyboard';
   }
@@ -44,11 +46,14 @@ export class Input {
       const m = Math.hypot(dx, dy);
       if (m > 1) mAim = { x: dx / m, y: dy / m };
     }
-    const mShoot = this.mouse.isDown;
+    // ЛКМ = обычная стрельба; ПКМ или Q = ракета (если есть ракетница).
+    const mShoot = this.mouse.leftButtonDown ? this.mouse.leftButtonDown() : this.mouse.isDown;
+    const mRocket = this.mouse.rightButtonDown ? this.mouse.rightButtonDown() : false;
     const kbSprint = k.SHIFT.isDown;
     const kbDash = k.SPACE.isDown;
     const kbInteract = k.E.isDown;
     const kbPause = k.ESC.isDown;
+    const kbRocket = k.Q.isDown;
 
     // ---- gamepad (standard mapping, first connected) ----
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -57,7 +62,7 @@ export class Input {
 
     let gpMove = { x: 0, y: 0 };
     let gpAim = null;
-    let gpSprint = false, gpDash = false, gpShoot = false, gpInteract = false, gpPause = false;
+    let gpSprint = false, gpDash = false, gpShoot = false, gpInteract = false, gpPause = false, gpRocket = false;
 
     if (gp) {
       gpMove = applyDeadzone({ x: gp.axes[0] || 0, y: gp.axes[1] || 0 }, STICK_DEADZONE_MOVE);
@@ -73,6 +78,8 @@ export class Input {
       gpPause = !!(gp.buttons[9] && gp.buttons[9].pressed);
       gpSprint = !!(gp.buttons[6] && gp.buttons[6].value > 0.2);
       gpShoot = !!(gp.buttons[7] && gp.buttons[7].value > 0.2);
+      // button 5 = RB (правый bumper) — ракета
+      gpRocket = !!(gp.buttons[5] && gp.buttons[5].pressed);
     }
 
     // активное устройство переключается только по факту нажатия — без таймера.
@@ -83,7 +90,7 @@ export class Input {
       gpMove.x !== 0 || gpMove.y !== 0 || !!gpAim
     );
     const anyKbActivity =
-      mShoot || kbSprint || kbDash || kbInteract || kbPause ||
+      mShoot || mRocket || kbSprint || kbDash || kbInteract || kbPause || kbRocket ||
       kbMove.x !== 0 || kbMove.y !== 0;
     if (anyGpActivity) this.activeDevice = 'gamepad';
     else if (anyKbActivity) this.activeDevice = 'keyboard';
@@ -98,16 +105,19 @@ export class Input {
     const dashHeld = gpDash || kbDash;
     const interactHeld = gpInteract || kbInteract;
     const pauseHeld = gpPause || kbPause;
+    const rocketHeld = gpRocket || mRocket || kbRocket;
 
     // edges
     const dash = dashHeld && !this.prev.dash;
     const interact = interactHeld && !this.prev.interact;
     const pause = pauseHeld && !this.prev.pause;
+    const rocket = rocketHeld && !this.prev.rocket;
     this.prev.dash = dashHeld;
     this.prev.interact = interactHeld;
     this.prev.pause = pauseHeld;
+    this.prev.rocket = rocketHeld;
 
-    return { move, aim, sprint, shoot, dash, interact, pause };
+    return { move, aim, sprint, shoot, dash, interact, pause, rocket };
   }
 
   setAimOrigin(x, y) {

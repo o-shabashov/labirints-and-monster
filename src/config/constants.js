@@ -40,10 +40,29 @@ export function isBlockingTile(t) {
 }
 
 // Разрушаемость стен (hybrid pixel-mask + sub-tile физика).
-// WALL_SUB — деление каждого тайла на NxN под-клеток для физики (4 → 8px).
-export const WALL_SUB                  = 4;
-export const WALL_ERASE_RADIUS_PX      = 10;   // радиус erase-кружка от попадания пули
-export const BULLET_DESTROYS_WALLS     = true; // глобальный switch на случай отладки
+// WALL_SUB — деление каждого тайла на NxN под-клеток для физики (8 → 4px).
+export const WALL_SUB                  = 8;
+export const WALL_ERASE_RADIUS_PX      = 10;   // радиус erase-кружка обычной пули (если включить)
+export const BULLET_DESTROYS_WALLS     = false; // обычная пуля стены НЕ разрушает
+
+// Ракетница — pickup, бесконечная, большой кулдаун, AoE-взрыв.
+export const ROCKET_SPEED              = 170;   // px/sec, медленная
+export const ROCKET_LIFETIME_MS        = 2200;
+export const ROCKET_COOLDOWN_MS        = 1600;
+export const ROCKET_DAMAGE             = 4;     // прямое попадание
+export const ROCKET_AOE_DAMAGE         = 3;     // монстрам в радиусе взрыва
+export const ROCKET_EXPLOSION_RADIUS   = 56;    // визуал + damage сферой
+export const ROCKET_WALL_ERASE_RADIUS  = 36;    // erase стен — крупная дырка
+export const ROCKET_PLAYER_RECOIL      = 220;   // px/sec отдача игрока назад
+export const ROCKET_PLAYER_RECOIL_MS   = 140;   // длительность recoil — на это время Player.update пропускает свой setVelocity
+export const ROCKET_MONSTER_KNOCKBACK  = 360;   // px/sec отброс врагов от центра
+export const CAMERA_SHAKE_MS           = 220;
+export const CAMERA_SHAKE_INTENSITY    = 0.012;
+
+// Тинт пола: общий пол чуть приглушённее, в дырках разрушенных стен —
+// заметно темнее, как «обугленный» след.
+export const FLOOR_TINT                = 0xa89886;
+export const FLOOR_BURNT_TINT          = 0x4a3d33;
 
 export const PLAYER_SPEED = 210;   // px/sec — чуть быстрее, чтобы не «тащиться»
 
