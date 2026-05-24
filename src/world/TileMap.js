@@ -167,10 +167,26 @@ export class TileMap {
     }
     if (!touched) return false;
 
-    // Erase визуала. Brush 32×32 даёт «жёсткий» круг ~16px радиусом при
-    // scale=1. Чтобы визуальная дырка совпадала с обнулёнными sub-cells,
-    // масштабируем brush пропорционально запрошенному radiusPx.
+    // Brush 32×32 даёт «жёсткий» круг ~16px радиусом при scale=1.
+    // Чтобы визуальная дырка совпадала с обнулёнными sub-cells,
+    // масштабируем пропорционально radiusPx.
     const brushScale = radiusPx / 14;
+
+    // 1. «Обугленные края» — тёмный stamp рисуется ВНУТРЬ wallsRT с blend
+    //    MULTIPLY. На стенах (alpha>0) тинт умножается → потемнение. Где
+    //    wallsRT уже прозрачен (старая дырка) — alpha остаётся 0, эффекта
+    //    нет. Чуть шире erase radius (×1.6), чтобы кайма выходила за
+    //    будущую дырку. Tint 0x5a5048 — светлее предыдущего (пользователь
+    //    просил «чуть светлее»).
+    const charStamp = this.scene.add.image(worldX, worldY, 'wall_damage_brush')
+      .setOrigin(0.5)
+      .setScale(brushScale * 1.6)
+      .setTint(0x5a5048);
+    charStamp.setBlendMode(Phaser.BlendModes.MULTIPLY);
+    this.wallsRT.draw(charStamp);
+    charStamp.destroy();
+
+    // 2. Erase — вырезаем центральную дырку поверх затемнения.
     const eraseImg = this.scene.add.image(worldX, worldY, 'wall_damage_brush')
       .setOrigin(0.5)
       .setScale(brushScale)
@@ -191,16 +207,6 @@ export class TileMap {
         }
       }
     }
-
-    // «Обугленные края» — тёмный sprite с MULTIPLY blend поверх wallsRT.
-    // На стенах (alpha>0) умножается → потемнение. На дырке (alpha=0)
-    // незаметен. Чуть шире erase radius, чтобы кайма выходила за дырку.
-    const charSpr = this.scene.add.image(worldX, worldY, 'wall_damage_brush')
-      .setOrigin(0.5)
-      .setScale(brushScale * 1.55)
-      .setTint(0x333028)
-      .setDepth(2.1);
-    charSpr.setBlendMode(Phaser.BlendModes.MULTIPLY);
 
     // Полностью разрушенный тайл становится FLOOR — pathfinding монстров
     // его автоматически обходит и пускает идти насквозь.
