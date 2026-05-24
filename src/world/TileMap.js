@@ -183,10 +183,12 @@ export class TileMap {
     this.wallsRT.draw(charStamp);
     charStamp.destroy();
 
-    // 2. Erase — soft brush (gradient) вырезает мягкий центр поверх каймы.
-    //    brushScale = radiusPx / 14 — соответствует обнулённой sub-area.
-    const eraseScale = radiusPx / 14;
-    const eraseImg = this.scene.add.image(worldX, worldY, 'wall_damage_brush')
+    // 2. Erase — hard brush (тот же wall_char_brush), scale=radiusPx/16.
+    //    radius=16 у hard brush совпадает с полем sub-grid обнуления, дырка
+    //    визуально точно совпадает с физикой. Soft gradient не подошёл —
+    //    alpha-fade оставлял «полупрозрачные» пиксели за пределами центра.
+    const eraseScale = radiusPx / 16;
+    const eraseImg = this.scene.add.image(worldX, worldY, 'wall_char_brush')
       .setOrigin(0.5)
       .setScale(eraseScale)
       .setVisible(false);
@@ -230,28 +232,52 @@ export class TileMap {
       }
     }
 
-    // Полностью разрушенный тайл становится FLOOR — pathfinding монстров
-    // его автоматически обходит и пускает идти насквозь.
+    // Дочистка: если >=50% sub-cells тайла пусты, считаем что стена
+    // фактически разрушена — обнуляем остаток sub-grid, переводим tile
+    // в FLOOR (pathfinding/AI заходят), и erase'им весь 32×32 в wallsRT.
+    // Без этого тайл оставался WALL для BFS пока не убран ВЕСЬ subGrid —
+    // монстры считали клетку непроходимой даже сквозь явную дырку.
     for (const key of touchedTiles) {
       const ty = Math.floor(key / this.width);
       const tx = key % this.width;
-      if (this._isTileFullyEmpty(tx, ty) && this.tiles[ty][tx] === TILE.WALL) {
-        this.tiles[ty][tx] = TILE.FLOOR;
-      }
+      if (this.tiles[ty][tx] !== TILE.WALL) continue;
+      if (this._isTileMostlyEmpty(tx, ty)) this._cleanupTile(tx, ty);
     }
 
     this._rebuildPhysics();
     return true;
   }
 
-  _isTileFullyEmpty(tx, ty) {
+  _isTileMostlyEmpty(tx, ty) {
+    const baseX = tx * WALL_SUB, baseY = ty * WALL_SUB;
+    const total = WALL_SUB * WALL_SUB;
+    let empty = 0;
+    for (let dy = 0; dy < WALL_SUB; dy++) {
+      for (let dx = 0; dx < WALL_SUB; dx++) {
+        if (!this.subGrid[baseY + dy][baseX + dx]) empty++;
+      }
+    }
+    return empty * 2 >= total;  // >=50%
+  }
+
+  _cleanupTile(tx, ty) {
+    // Обнуляем всё sub-grid у этого тайла
     const baseX = tx * WALL_SUB, baseY = ty * WALL_SUB;
     for (let dy = 0; dy < WALL_SUB; dy++) {
       for (let dx = 0; dx < WALL_SUB; dx++) {
-        if (this.subGrid[baseY + dy][baseX + dx]) return false;
+        this.subGrid[baseY + dy][baseX + dx] = 0;
       }
     }
-    return true;
+    this.tiles[ty][tx] = TILE.FLOOR;
+    // Стираем весь 32×32 квадрат в wallsRT — rectangle с alpha=1
+    // используется как erase-stamp.
+    const cx = tx * TILE_SIZE + TILE_SIZE / 2;
+    const cy = ty * TILE_SIZE + TILE_SIZE / 2;
+    const rect = this.scene.add.rectangle(cx, cy, TILE_SIZE, TILE_SIZE, 0xffffff)
+      .setOrigin(0.5)
+      .setVisible(false);
+    this.wallsRT.erase(rect);
+    rect.destroy();
   }
 
   findDoors() {
