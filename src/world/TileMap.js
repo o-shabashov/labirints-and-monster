@@ -269,15 +269,16 @@ export class TileMap {
       }
     }
     this.tiles[ty][tx] = TILE.FLOOR;
-    // Стираем весь 32×32 квадрат в wallsRT — rectangle с alpha=1
-    // используется как erase-stamp.
+    // Стираем 32×32 в wallsRT через texture-based image. Phaser RT.erase
+    // работает только с объектами, у которых есть texture — Rectangle
+    // (primitive geometry) молча игнорируется, что давало «стену-призрак».
     const cx = tx * TILE_SIZE + TILE_SIZE / 2;
     const cy = ty * TILE_SIZE + TILE_SIZE / 2;
-    const rect = this.scene.add.rectangle(cx, cy, TILE_SIZE, TILE_SIZE, 0xffffff)
+    const eraser = this.scene.add.image(cx, cy, 'tile_eraser')
       .setOrigin(0.5)
       .setVisible(false);
-    this.wallsRT.erase(rect);
-    rect.destroy();
+    this.wallsRT.erase(eraser);
+    eraser.destroy();
   }
 
   findDoors() {

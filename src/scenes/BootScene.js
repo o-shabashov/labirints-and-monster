@@ -214,6 +214,19 @@ export class BootScene extends Phaser.Scene {
     epx.fillRect(0, 0, epSize, epSize);
     this.textures.addCanvas('explosion_particle', epCv);
 
+    // Tile-eraser — 32×32 solid white. Используется в TileMap._cleanupTile
+    // для erase'а всего тайла в wallsRT. RenderTexture.erase() работает
+    // только с texture-based объектами (Image/Sprite). Phaser.Rectangle —
+    // это primitive geometry БЕЗ texture, erase его молча игнорирует:
+    // визуально стена остаётся, хотя физика убрана. Был баг.
+    const teSize = 32;
+    const teCv = document.createElement('canvas');
+    teCv.width = teCv.height = teSize;
+    const tex = teCv.getContext('2d');
+    tex.fillStyle = 'rgba(255,255,255,1)';
+    tex.fillRect(0, 0, teSize, teSize);
+    this.textures.addCanvas('tile_eraser', teCv);
+
     // Hard-edge brush для затемнения каймы вокруг дырки. Сплошной белый
     // круг с alpha=1 внутри радиуса 16, alpha=0 снаружи. Sharp edge нужен
     // чтобы при MULTIPLY blend alpha не «съедала» альфу стены — иначе
