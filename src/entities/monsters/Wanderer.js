@@ -11,7 +11,7 @@ const WANDER_PICK_MS = 1500;
 export class Wanderer extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_wanderer');
-    this.speed = PLAYER_SPEED * 0.65;
+    this.speed = PLAYER_SPEED * 0.85;
     this.mode = 'wander';   // 'wander' | 'chase'
     this.loseInterestAt = 0;
     this.wanderTargetAt = 0;

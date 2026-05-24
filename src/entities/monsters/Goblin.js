@@ -11,7 +11,7 @@ const WANDER_PICK_MS = 900;
 export class Goblin extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_goblin');
-    this.speed = PLAYER_SPEED * 0.85;
+    this.speed = PLAYER_SPEED * 1.10;
     this.hp = 1;
     this.mode = 'wander';
     this.loseInterestAt = 0;

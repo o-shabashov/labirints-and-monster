@@ -10,7 +10,7 @@ const WANDER_PICK_MS = 1400;
 export class MaskedOrc extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_masked');
-    this.speed = PLAYER_SPEED * 0.6;
+    this.speed = PLAYER_SPEED * 0.85;
     this.hp = 1;
     this.mode = 'wander';
     this.loseInterestAt = 0;

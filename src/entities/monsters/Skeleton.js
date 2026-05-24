@@ -9,7 +9,7 @@ const REPATH_MS = 350;
 export class Skeleton extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_skeleton');
-    this.speed = PLAYER_SPEED * 0.4;
+    this.speed = PLAYER_SPEED * 0.65;
     this.hp = 2;
   }
   update(dtMs, player, map) {

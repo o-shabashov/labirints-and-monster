@@ -10,7 +10,7 @@ export class BigZombie extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_bigzombie');
     this.sprite.setScale(1.2);
-    this.speed = PLAYER_SPEED * 0.3;
+    this.speed = PLAYER_SPEED * 0.55;
     this.hp = 4;
   }
   update(dtMs, player, map) {

@@ -41,6 +41,7 @@ import { Rocket } from '../entities/Rocket.js';
 import { Bomb } from '../entities/Bomb.js';
 import { DEBUG } from '../config/debug.js';
 import { log } from '../systems/Logger.js';
+import { Difficulty } from '../systems/Difficulty.js';
 import { Door } from '../entities/Door.js';
 import { Chest } from '../entities/Chest.js';
 import { addEffect, hasEffect, tickEffects } from '../systems/Effects.js';
@@ -114,6 +115,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.player.sprite, this.exitZone, () => this._onReachExit());
 
     this.inputSys = new Input(this);
+    this.difficulty = new Difficulty();
 
     this.monsters = [];
     {
@@ -359,7 +361,7 @@ export class GameScene extends Phaser.Scene {
             this.sound.hit();
             if (m.takeDamage(dmg, hitX, hitY)) {
               this.sound.monsterKilled();
-              this.stats.monstersKilled++;
+              this.stats.monstersKilled++; this.difficulty.trackKill(this.time.now);
               this.player.addWeaponXp();
               this.monsters = this.monsters.filter(x => x !== m);
             }
@@ -406,7 +408,7 @@ export class GameScene extends Phaser.Scene {
             const hitX = r.sprite.x, hitY = r.sprite.y;
             if (m.takeDamage(ROCKET_DAMAGE, hitX, hitY)) {
               this.sound.monsterKilled();
-              this.stats.monstersKilled++;
+              this.stats.monstersKilled++; this.difficulty.trackKill(this.time.now);
               this.player.addWeaponXp();
               this.monsters = this.monsters.filter(x => x !== m);
             }
@@ -596,6 +598,7 @@ export class GameScene extends Phaser.Scene {
       bombs: this.player.bombsAmmo || 0,
       level: this.currentLevel,
       maxLevel: MAX_LEVELS,
+      difficulty: this.difficulty ? this.difficulty.multiplier(this.time.now) : 1.0,
     });
   }
 
@@ -697,7 +700,7 @@ export class GameScene extends Phaser.Scene {
       if (proj.dead) return;
       proj.dead = true;
       sprite.destroy();
-      const took = this.player.takeHit(sx, sy);
+      const took = this.player.takeHit(sx, sy); if (took) this.difficulty.trackDamage(this.time.now);
       if (took) {
         this.sound.playerHurt();
         this.game.events.emit('hud:update', { hp: this.player.hp });
@@ -713,14 +716,21 @@ export class GameScene extends Phaser.Scene {
   // Универсальный спавн монстра — initial и для волн/респаунов. Привязывает
   // обычные коллайдеры и overlap c игроком (с takeHit и GameOver-on-death).
   // Текущий tier монстров: 1 на старте, +1 каждые MOB_TIER_PERIOD_MS, cap MAX.
+  // Adaptive tier — period делится на difficulty multiplier. High difficulty
+  // → быстрее tier'ы (монстры жирнее раньше). Low difficulty → медленнее.
+  _effectiveTierPeriod() {
+    const m = this.difficulty ? this.difficulty.multiplier(this.time.now) : 1.0;
+    return MOB_TIER_PERIOD_MS / m;
+  }
   mobTier() {
     const elapsedMs = this.time.now - (this.stats?.startedAt ?? this.time.now);
-    return Math.min(MOB_TIER_MAX, 1 + Math.floor(elapsedMs / MOB_TIER_PERIOD_MS));
+    return Math.min(MOB_TIER_MAX, 1 + Math.floor(elapsedMs / this._effectiveTierPeriod()));
   }
   mobTierFraction() {
     const elapsedMs = this.time.now - (this.stats?.startedAt ?? this.time.now);
-    const inTier = elapsedMs % MOB_TIER_PERIOD_MS;
-    return Math.min(1, inTier / MOB_TIER_PERIOD_MS);
+    const period = this._effectiveTierPeriod();
+    const inTier = elapsedMs % period;
+    return Math.min(1, inTier / period);
   }
 
   spawnMonster(Cls, wx, wy) {
@@ -738,7 +748,7 @@ export class GameScene extends Phaser.Scene {
     // упирается в моба, не проходит сквозь. Между monstr'ами collider'а нет —
     // они проходят друг через друга, не образуют пробок.
     this.physics.add.collider(this.player.sprite, m.sprite, () => {
-      const took = this.player.takeHit(m.sprite.x, m.sprite.y);
+      const took = this.player.takeHit(m.sprite.x, m.sprite.y); if (took) this.difficulty.trackDamage(this.time.now);
       if (took) {
         this.sound.playerHurt();
         this.game.events.emit('hud:update', { hp: this.player.hp });
@@ -949,7 +959,7 @@ export class GameScene extends Phaser.Scene {
       }
       if (m.takeDamage(aoeDmg, worldX, worldY)) {
         this.sound.monsterKilled();
-        this.stats.monstersKilled++;
+        this.stats.monstersKilled++; this.difficulty.trackKill(this.time.now);
         this.player.addWeaponXp();
         this.monsters = this.monsters.filter(x => x !== m);
       }

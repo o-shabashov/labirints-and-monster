@@ -70,6 +70,13 @@ export class UIScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '13px', color: '#888888',
     }).setOrigin(1, 0);
 
+    // Сложность — текст справа в центре топбара, между HP-блоком и mobLabel.
+    // Цвет реагирует на величину (зелёный=легко, жёлтый=norm, оранжевый,
+    // красный=жесть).
+    this.difficultyLabel = this.add.text(GAME_W / 2 + 40, 28, '', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#aaaaaa',
+    }).setOrigin(0, 0);
+
     // ряд 2 (y=28): stamina-бар и эффекты + interactHint по центру
     this.staminaBg = this.add.rectangle(12, 30, 120, 8, 0x222222).setOrigin(0, 0);
     this.staminaBar = this.add.rectangle(12, 30, 120, 8, 0x4ec9ff).setOrigin(0, 0);
@@ -140,6 +147,12 @@ export class UIScene extends Phaser.Scene {
     if (state.level != null) {
       const max = state.maxLevel || '?';
       this.levelLabel.setText(`Уровень ${state.level}/${max}`);
+    }
+    if (state.difficulty != null) {
+      const d = state.difficulty;
+      const col = d < 0.85 ? '#81c784' : d < 1.05 ? '#aaaaaa' : d < 1.30 ? '#ffd54f' : '#ff7043';
+      this.difficultyLabel.setColor(col);
+      this.difficultyLabel.setText(`Сложность ×${d.toFixed(2)}`);
     }
     if (state.bombs != null) {
       const n = state.bombs;

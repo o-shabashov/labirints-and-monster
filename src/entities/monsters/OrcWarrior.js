@@ -9,7 +9,7 @@ const REPATH_MS = 280;
 export class OrcWarrior extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_orc');
-    this.speed = PLAYER_SPEED * 0.5;
+    this.speed = PLAYER_SPEED * 0.75;
     this.hp = 2;
   }
   update(dtMs, player, map) {

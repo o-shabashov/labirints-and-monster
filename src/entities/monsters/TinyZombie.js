@@ -10,7 +10,7 @@ export class TinyZombie extends Monster {
   constructor(scene, x, y) {
     super(scene, x, y, 'monster_tinyzombie');
     this.sprite.setScale(0.8);
-    this.speed = PLAYER_SPEED * 0.7;
+    this.speed = PLAYER_SPEED * 0.90;
     this.hp = 1;
   }
   update(dtMs, player, map) {
