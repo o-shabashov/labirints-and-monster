@@ -2,10 +2,9 @@ import {
   TILE_SIZE, GAME_W, GAME_H,
   TILE, isBlockingTile,
   WALL_SUB, WALL_ERASE_RADIUS_PX,
-  FLOOR_TINT, FLOOR_BURNT_TINT,
 } from '../config/constants.js';
 
-const SUB_SIZE = TILE_SIZE / WALL_SUB;  // 8px при WALL_SUB=4
+const SUB_SIZE = TILE_SIZE / WALL_SUB;  // 4px при WALL_SUB=8
 
 export class TileMap {
   constructor(scene, tiles) {
@@ -44,14 +43,13 @@ export class TileMap {
   _renderFloor() {
     this.entrance = null;
     this.exit = null;
-    // burntTiles — track «обугленный» floor sprite в каждой разрушенной клетке,
-    // чтобы не плодить дубли при многократных попаданиях в один tile.
-    this._burntTiles = new Map();   // key: ty*width+tx → sprite
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const px = x * TILE_SIZE + TILE_SIZE / 2;
         const py = y * TILE_SIZE + TILE_SIZE / 2;
-        this.scene.add.image(px, py, 'floor').setScale(2).setTint(FLOOR_TINT).setDepth(0);
+        // floor_plain — однотонная canvas-текстура без бордер, 32×32.
+        // Scale=1 (а не 2) потому что текстура уже целевого размера.
+        this.scene.add.image(px, py, 'floor_plain').setDepth(0);
         const t = this.tiles[y][x];
         if (t === TILE.ENTRANCE) {
           this.scene.add.image(px, py, 'entrance').setScale(2).setDepth(0);
@@ -68,7 +66,8 @@ export class TileMap {
     // Единый RenderTexture для всех стен. Erase soft_circle при попадании
     // пули → пиксельные дырки. NEAREST filter, чтобы pixel-art tile-текстура
     // не размывалась при transient scale операциях RT.
-    // depth=2 → выше burnt-floor (depth=1) и базового floor (depth=0).
+    // depth=2 → над базовым floor (0). Обугленные края при взрыве идут
+    // отдельными sprite'ами с MULTIPLY blend и depth=2.1 (см. damageAt).
     this.wallsRT = this.scene.add.renderTexture(0, 0, GAME_W, GAME_H).setOrigin(0, 0).setDepth(2);
     if (this.wallsRT.texture && this.wallsRT.texture.setFilter) {
       this.wallsRT.texture.setFilter(Phaser.Textures.FilterMode.NEAREST);
@@ -193,6 +192,16 @@ export class TileMap {
       }
     }
 
+    // «Обугленные края» — тёмный sprite с MULTIPLY blend поверх wallsRT.
+    // На стенах (alpha>0) умножается → потемнение. На дырке (alpha=0)
+    // незаметен. Чуть шире erase radius, чтобы кайма выходила за дырку.
+    const charSpr = this.scene.add.image(worldX, worldY, 'wall_damage_brush')
+      .setOrigin(0.5)
+      .setScale(brushScale * 1.55)
+      .setTint(0x333028)
+      .setDepth(2.1);
+    charSpr.setBlendMode(Phaser.BlendModes.MULTIPLY);
+
     // Полностью разрушенный тайл становится FLOOR — pathfinding монстров
     // его автоматически обходит и пускает идти насквозь.
     for (const key of touchedTiles) {
@@ -200,26 +209,11 @@ export class TileMap {
       const tx = key % this.width;
       if (this._isTileFullyEmpty(tx, ty) && this.tiles[ty][tx] === TILE.WALL) {
         this.tiles[ty][tx] = TILE.FLOOR;
-        this._stampBurntFloor(tx, ty);
-      } else if (this.tiles[ty][tx] === TILE.WALL && !this._burntTiles.has(key)) {
-        // Частично разрушенный wall — тоже подкладываем тёмный пол, чтобы
-        // через дырку в стене виднелся обугленный оттенок, а не светлый floor.
-        this._stampBurntFloor(tx, ty);
       }
     }
 
     this._rebuildPhysics();
     return true;
-  }
-
-  _stampBurntFloor(tx, ty) {
-    const key = ty * this.width + tx;
-    if (this._burntTiles.has(key)) return;
-    const px = tx * TILE_SIZE + TILE_SIZE / 2;
-    const py = ty * TILE_SIZE + TILE_SIZE / 2;
-    // depth=1: над базовым floor (0), под wallsRT (2). Видим только в дырках.
-    const spr = this.scene.add.image(px, py, 'floor').setScale(2).setTint(FLOOR_BURNT_TINT).setDepth(1);
-    this._burntTiles.set(key, spr);
   }
 
   _isTileFullyEmpty(tx, ty) {

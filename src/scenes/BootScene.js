@@ -129,6 +129,25 @@ export class BootScene extends Phaser.Scene {
     cx.fillRect(0, 0, size, size);
     this.textures.addCanvas('vignette', cv);
 
+    // Однотонный пол 32×32 — без бордер, лёгкий шум чтоб не казался
+    // плоской заливкой. Цвет — приглушённый коричневый, ровно по всей
+    // площади (не граничит как 0x72 floor_1).
+    const flSize = 32;
+    const flCv = document.createElement('canvas');
+    flCv.width = flCv.height = flSize;
+    const flx = flCv.getContext('2d');
+    flx.fillStyle = '#3a302a';
+    flx.fillRect(0, 0, flSize, flSize);
+    for (let i = 0; i < 70; i++) {
+      const xx = Math.floor(Math.random() * flSize);
+      const yy = Math.floor(Math.random() * flSize);
+      const a = 0.06 + Math.random() * 0.10;
+      const v = 50 + Math.floor(Math.random() * 30);
+      flx.fillStyle = `rgba(${v},${v - 6},${v - 12},${a})`;
+      flx.fillRect(xx, yy, 1, 1);
+    }
+    this.textures.addCanvas('floor_plain', flCv);
+
     // Ракета — продолговатая 24×10 капля: серый корпус, оранжевый нос,
     // тонкая жёлтая полоса. Спрайт ориентирован «вправо» (поворачивается
     // через setRotation на лету).
