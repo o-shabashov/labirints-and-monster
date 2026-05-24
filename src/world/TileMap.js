@@ -3,6 +3,7 @@ import {
   TILE, isBlockingTile,
   WALL_SUB, WALL_ERASE_RADIUS_PX, WALL_CHAR_RIM_PX,
 } from '../config/constants.js';
+import { log } from '../systems/Logger.js';
 
 const SUB_SIZE = TILE_SIZE / WALL_SUB;  // 4px при WALL_SUB=8
 
@@ -131,12 +132,16 @@ export class TileMap {
   // Повреждение стен в точке (worldX, worldY) кружком radius.
   // Возвращает true, если хоть что-то разрушилось.
   damageAt(worldX, worldY, radiusPx = WALL_ERASE_RADIUS_PX) {
-    if (!this.wallsRT) return false;
-    // Центральный tile — если SOLID_WALL, эффекта нет (попали в неразрушимое).
+    if (!this.wallsRT) {
+      log('wall', 'damageAt: no wallsRT, skipping');
+      return false;
+    }
     const ctx = Math.floor(worldX / TILE_SIZE);
     const cty = Math.floor(worldY / TILE_SIZE);
+    // Центральный tile — если SOLID_WALL, эффекта нет (попали в неразрушимое).
     if (cty >= 0 && cty < this.height && ctx >= 0 && ctx < this.width
         && this.tiles[cty][ctx] === TILE.SOLID_WALL) {
+      log('wall', 'damageAt: hit SOLID_WALL, no damage', { tx: ctx, ty: cty });
       return false;
     }
 
@@ -165,28 +170,21 @@ export class TileMap {
         touchedTiles.add(ty * this.width + tx);
       }
     }
-    if (!touched) return false;
+    if (!touched) {
+      log('wall', 'damageAt: nothing to damage (no solid sub-cells in radius)', { worldX, worldY, radiusPx });
+      return false;
+    }
+    log('wall', 'damageAt', {
+      worldX, worldY, radiusPx,
+      centerTile: { tx: ctx, ty: cty, type: this.tiles[cty]?.[ctx] },
+      tilesTouched: Array.from(touchedTiles).map(k => ({
+        tx: k % this.width, ty: Math.floor(k / this.width),
+      })),
+    });
 
-    // 1. Обугленная кайма — hard-edge brush, чуть шире erase радиуса
-    //    (фиксированная ширина WALL_CHAR_RIM_PX). Multiply blend: src.rgb *
-    //    dst.rgb, src.alpha=1 → dst.alpha не меняется (стена остаётся
-    //    непрозрачной, не становится «полупрозрачной»). На прозрачных
-    //    участках wallsRT (старые дырки) dst.rgb=0 → final.rgb=0 но
-    //    dst.alpha=0 → результат всё ещё прозрачный. Кайма видна только на
-    //    оставшихся стенах.
-    const charScale = (radiusPx + WALL_CHAR_RIM_PX) / 16;  // hard brush радиус 16
-    const charStamp = this.scene.add.image(worldX, worldY, 'wall_char_brush')
-      .setOrigin(0.5)
-      .setScale(charScale)
-      .setTint(0x6a5f50);
-    charStamp.setBlendMode(Phaser.BlendModes.MULTIPLY);
-    this.wallsRT.draw(charStamp);
-    charStamp.destroy();
-
-    // 2. Erase — hard brush (тот же wall_char_brush), scale=radiusPx/16.
-    //    radius=16 у hard brush совпадает с полем sub-grid обнуления, дырка
-    //    визуально точно совпадает с физикой. Soft gradient не подошёл —
-    //    alpha-fade оставлял «полупрозрачные» пиксели за пределами центра.
+    // Erase визуала. wall_char_brush — hard круг diameter 32 (alpha=1
+    // внутри radius 16). scale=radiusPx/16 → effective radius = radiusPx,
+    // в точности совпадает с обнулённым sub-grid.
     const eraseScale = radiusPx / 16;
     const eraseImg = this.scene.add.image(worldX, worldY, 'wall_char_brush')
       .setOrigin(0.5)
@@ -195,9 +193,7 @@ export class TileMap {
     this.wallsRT.erase(eraseImg);
     eraseImg.destroy();
 
-    // 3. Анимированные огоньки по периметру дырки — 6-8 sprite'ов
-    //    explosion_particle с оранжевым тинтом, fade'ятся 700-1300ms.
-    //    Создают эффект тлеющих углей сразу после взрыва.
+    // Огоньки по периметру дырки — оранжевые искры, fade за 700-1300ms.
     const sparkCount = 6 + Math.floor(Math.random() * 3);
     const sparkRadius = radiusPx + WALL_CHAR_RIM_PX * 0.5;
     for (let i = 0; i < sparkCount; i++) {
@@ -232,17 +228,22 @@ export class TileMap {
       }
     }
 
-    // Дочистка: если >=50% sub-cells тайла пусты, считаем что стена
+    // Дочистка: если >=25% sub-cells тайла пусты, считаем что стена
     // фактически разрушена — обнуляем остаток sub-grid, переводим tile
     // в FLOOR (pathfinding/AI заходят), и erase'им весь 32×32 в wallsRT.
     // Без этого тайл оставался WALL для BFS пока не убран ВЕСЬ subGrid —
     // монстры считали клетку непроходимой даже сквозь явную дырку.
+    const cleanedUp = [];
     for (const key of touchedTiles) {
       const ty = Math.floor(key / this.width);
       const tx = key % this.width;
       if (this.tiles[ty][tx] !== TILE.WALL) continue;
-      if (this._isTileMostlyEmpty(tx, ty)) this._cleanupTile(tx, ty);
+      if (this._isTileMostlyEmpty(tx, ty)) {
+        this._cleanupTile(tx, ty);
+        cleanedUp.push({ tx, ty });
+      }
     }
+    if (cleanedUp.length) log('wall', 'cleanupTile', { tiles: cleanedUp });
 
     this._rebuildPhysics();
     return true;
@@ -257,7 +258,7 @@ export class TileMap {
         if (!this.subGrid[baseY + dy][baseX + dx]) empty++;
       }
     }
-    return empty * 2 >= total;  // >=50%
+    return empty * 4 >= total;  // >=25% — даже частично разрушенный тайл считается «дырой»
   }
 
   _cleanupTile(tx, ty) {

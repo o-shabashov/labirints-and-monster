@@ -35,6 +35,7 @@ import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
 import { Rocket } from '../entities/Rocket.js';
 import { DEBUG } from '../config/debug.js';
+import { log } from '../systems/Logger.js';
 import { Door } from '../entities/Door.js';
 import { Chest } from '../entities/Chest.js';
 import { addEffect, hasEffect, tickEffects } from '../systems/Effects.js';
@@ -321,8 +322,15 @@ export class GameScene extends Phaser.Scene {
 
     // Ракета — edge-кнопка (одиночный выстрел на нажатие, не auto-fire)
     if (input.rocket) {
+      log('input', 'rocket pressed');
       const shot = this.player.tryShootRocket(this.time.now);
+      if (!shot) log('rocket', 'tryShootRocket returned null', {
+        hasLauncher: this.player.hasRocketLauncher,
+        aim: this.player.aim,
+        cooldownLeft: Math.max(0, this.player.nextRocketAt - this.time.now),
+      });
       if (shot) {
+        log('rocket', 'fire', { ox: shot.ox, oy: shot.oy, dx: shot.x, dy: shot.y });
         const r = new Rocket(this, shot.ox, shot.oy, shot.x, shot.y);
         r.sprite.setDepth(4);
         const trigger = () => {
@@ -777,6 +785,7 @@ export class GameScene extends Phaser.Scene {
   // Взрыв ракеты в (x,y): тряска камеры, частицы, AoE damage+knockback
   // монстрам, разрушение стен 1-3 рваными кратерами.
   explode(worldX, worldY) {
+    log('rocket', 'explode', { worldX, worldY });
     this.cameras.main.shake(CAMERA_SHAKE_MS, CAMERA_SHAKE_INTENSITY);
     // 1-3 случайных кратера со смещением и разным радиусом → асимметричная
     // рваная дыра вместо идеального круга.
