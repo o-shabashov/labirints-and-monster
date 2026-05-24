@@ -34,6 +34,7 @@ import { MaskedOrc } from '../entities/monsters/MaskedOrc.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
 import { Rocket } from '../entities/Rocket.js';
+import { DEBUG } from '../config/debug.js';
 import { Door } from '../entities/Door.js';
 import { Chest } from '../entities/Chest.js';
 import { addEffect, hasEffect, tickEffects } from '../systems/Effects.js';
@@ -72,6 +73,10 @@ export class GameScene extends Phaser.Scene {
     const spawn = this.map.tileToWorld(e.x, e.y);
     this.player = new Player(this, spawn.x, spawn.y);
     this.physics.add.collider(this.player.sprite, this.map.walls);
+    if (DEBUG) {
+      this.player.hasRocketLauncher = true;
+      console.log('[DEBUG] rocket launcher granted at spawn');
+    }
 
     const exitPos = this.map.tileToWorld(this.map.exit.x, this.map.exit.y);
     this.exitZone = this.add.zone(exitPos.x, exitPos.y, TILE_SIZE, TILE_SIZE);
