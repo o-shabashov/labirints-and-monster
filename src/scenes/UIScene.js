@@ -43,6 +43,14 @@ export class UIScene extends Phaser.Scene {
     this.keysText = this.add.text(340, 6, '', {
       fontFamily: 'monospace', fontSize: '16px', color: '#dddddd',
     });
+
+    // Иконка ракетницы + cooldown-bar. Скрыты пока пользователь не подобрал.
+    this.rocketIcon = this.add.image(470, 14, 'pickup_rocket').setOrigin(0, 0.5);
+    this.rocketIcon.setVisible(false);
+    this.rocketBarBg = this.add.rectangle(470, 26, 32, 3, 0x222222).setOrigin(0, 0);
+    this.rocketBar   = this.add.rectangle(470, 26, 32, 3, 0xff7043).setOrigin(0, 0);
+    this.rocketBarBg.setVisible(false);
+    this.rocketBar.setVisible(false);
     // живые иконки ключей — спрайты flask_*. Заполняются в onUpdate.
     this.keyIcons = [];
     this.deviceIndicator = this.add.text(GAME_W - 12, 6, '', {
@@ -115,6 +123,20 @@ export class UIScene extends Phaser.Scene {
     if (state.mobTier != null) {
       this.mobLabel.setText(`Монстры ур.${state.mobTier}`);
       this.mobBar.width = 90 * (state.mobTierFraction ?? 0);
+    }
+    if (state.rocket != null) {
+      const has = !!state.rocket.has;
+      this.rocketIcon.setVisible(has);
+      this.rocketBarBg.setVisible(has);
+      this.rocketBar.setVisible(has);
+      if (has) {
+        // bar заполняется ПО МЕРЕ восстановления (1=ready, 0=just fired)
+        const ready = 1 - (state.rocket.cooldownFrac ?? 0);
+        this.rocketBar.width = 32 * ready;
+        // tint: серый когда не готов, оранжевый когда готов
+        this.rocketBar.fillColor = ready >= 0.999 ? 0xff7043 : 0x6a6a6a;
+        this.rocketIcon.setAlpha(ready >= 0.999 ? 1 : 0.55);
+      }
     }
   }
 }

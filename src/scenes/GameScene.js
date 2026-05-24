@@ -3,6 +3,7 @@ import {
   isBlockingTile, BULLET_DESTROYS_WALLS,
   ROCKET_DAMAGE, ROCKET_AOE_DAMAGE, ROCKET_EXPLOSION_RADIUS,
   ROCKET_WALL_ERASE_RADIUS, ROCKET_MONSTER_KNOCKBACK,
+  ROCKET_COOLDOWN_MS,
   CAMERA_SHAKE_MS, CAMERA_SHAKE_INTENSITY,
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
@@ -508,6 +509,13 @@ export class GameScene extends Phaser.Scene {
       weaponRateMs: fireMs,
       mobTier: this.mobTier(),
       mobTierFraction: this.mobTierFraction(),
+      rocket: {
+        has: this.player.hasRocketLauncher,
+        cooldownFrac: this.player.hasRocketLauncher
+          ? Math.max(0, Math.min(1,
+              (this.player.nextRocketAt - this.time.now) / ROCKET_COOLDOWN_MS))
+          : 0,
+      },
     });
   }
 
