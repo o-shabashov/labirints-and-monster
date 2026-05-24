@@ -228,19 +228,20 @@ export class TileMap {
       }
     }
 
-    // Дочистка: если >=25% sub-cells тайла пусты, считаем что стена
-    // фактически разрушена — обнуляем остаток sub-grid, переводим tile
-    // в FLOOR (pathfinding/AI заходят), и erase'им весь 32×32 в wallsRT.
-    // Без этого тайл оставался WALL для BFS пока не убран ВЕСЬ subGrid —
-    // монстры считали клетку непроходимой даже сквозь явную дырку.
+    // Дочистка: проходим по ВСЕМ tiles в bbox повреждения (а не только
+    // touchedTiles). Соседний tile мог быть уже частично empty от прошлого
+    // damage и сейчас перейти порог >=25% — touchedTiles его не содержит,
+    // потому что в этом damage его sub-cells не обнулились (они уже были 0).
+    // Без этого баг: «крайний tile остаётся прямоугольным» когда взрыв
+    // приходится между двумя тайлами.
     const cleanedUp = [];
-    for (const key of touchedTiles) {
-      const ty = Math.floor(key / this.width);
-      const tx = key % this.width;
-      if (this.tiles[ty][tx] !== TILE.WALL) continue;
-      if (this._isTileMostlyEmpty(tx, ty)) {
-        this._cleanupTile(tx, ty);
-        cleanedUp.push({ tx, ty });
+    for (let ty = minTy; ty <= maxTy; ty++) {
+      for (let tx = minTx; tx <= maxTx; tx++) {
+        if (this.tiles[ty][tx] !== TILE.WALL) continue;
+        if (this._isTileMostlyEmpty(tx, ty)) {
+          this._cleanupTile(tx, ty);
+          cleanedUp.push({ tx, ty });
+        }
       }
     }
     if (cleanedUp.length) log('wall', 'cleanupTile', { tiles: cleanedUp });
@@ -280,6 +281,45 @@ export class TileMap {
       .setVisible(false);
     this.wallsRT.erase(eraser);
     eraser.destroy();
+    this._burnTileEdges(cx, cy);
+  }
+
+  // Тлеющий эффект 4 волнами по периметру разрушенного тайла. Каждая
+  // волна спавнит 4-6 мини-огоньков, которые поднимаются вверх и гаснут.
+  // Длительность всего: ~1.5 сек.
+  _burnTileEdges(cx, cy) {
+    const waves = 4;
+    const intervalMs = 250;
+    for (let w = 0; w < waves; w++) {
+      this.scene.time.delayedCall(w * intervalMs, () => {
+        const count = 4 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < count; i++) {
+          const side = Math.floor(Math.random() * 4);
+          const t = Math.random();
+          let fx = 0, fy = 0;
+          if (side === 0)      { fx = cx - 16 + t * 32; fy = cy - 16; }
+          else if (side === 1) { fx = cx + 16;          fy = cy - 16 + t * 32; }
+          else if (side === 2) { fx = cx - 16 + t * 32; fy = cy + 16; }
+          else                 { fx = cx - 16;          fy = cy - 16 + t * 32; }
+          fx += (Math.random() - 0.5) * 4;
+          fy += (Math.random() - 0.5) * 4;
+          const sp = this.scene.add.image(fx, fy, 'explosion_particle')
+            .setDepth(2.2)
+            .setScale(0.3 + Math.random() * 0.3)
+            .setTint(0xff8844)
+            .setAlpha(0.9);
+          this.scene.tweens.add({
+            targets: sp,
+            y: fy - 6 - Math.random() * 10,   // огонёк поднимается вверх
+            alpha: { from: 0.9, to: 0 },
+            scale: { from: 0.6, to: 0.15 },
+            duration: 400 + Math.random() * 300,
+            ease: 'Sine.easeOut',
+            onComplete: () => sp.destroy(),
+          });
+        }
+      });
+    }
   }
 
   findDoors() {
