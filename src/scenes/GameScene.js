@@ -489,7 +489,7 @@ export class GameScene extends Phaser.Scene {
       poison.nextTickAt = pNow + POISON_TICK_MS;
       if (this.player.isDead()) {
         this.sound.gameover();
-        this.scene.start('GameOverScene', this.buildSummary());
+        this._gameOver();
         return;
       }
     }
@@ -703,7 +703,7 @@ export class GameScene extends Phaser.Scene {
         this.game.events.emit('hud:update', { hp: this.player.hp });
         if (this.player.isDead()) {
           this.sound.gameover();
-          this.scene.start('GameOverScene', this.buildSummary());
+          this._gameOver();
         }
       }
     });
@@ -744,7 +744,7 @@ export class GameScene extends Phaser.Scene {
         this.game.events.emit('hud:update', { hp: this.player.hp });
         if (this.player.isDead()) {
           this.sound.gameover();
-          this.scene.start('GameOverScene', this.buildSummary());
+          this._gameOver();
         }
       }
     });
@@ -955,6 +955,18 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.sound.explosion();
+  }
+
+  // Смерть игрока — GameOver overlay поверх замороженной сцены.
+  // launch (не start) запускает GameOverScene дополнительно; pause
+  // останавливает GameScene update, но render продолжается → сцена
+  // видна на фоне.
+  _gameOver() {
+    if (this._gameOverShown) return;
+    this._gameOverShown = true;
+    const summary = this.buildSummary();
+    this.scene.pause();
+    this.scene.launch('GameOverScene', summary);
   }
 
   // Игрок дошёл до exit — следующий уровень или финальная Victory.

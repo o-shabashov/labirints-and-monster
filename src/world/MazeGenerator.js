@@ -277,8 +277,11 @@ function placeEntranceExitDoors(grid, width, height, passages, seed) {
     const tile = doorColors[i];
     // bounds — carve мог сохранить в passages cell за пределами области
     // (y+1 == height-1 на нижней строке), эти клетки скипаем.
+    // ВАЖНО: не перетираем ENTRANCE/EXIT — иначе можно потерять единственный
+    // выход с уровня (баг: crash на _onReachExit потому что this.map.exit=null).
     const inside = pick.cells.filter(c =>
       c.x > 0 && c.x < width - 1 && c.y > 0 && c.y < height - 1
+      && grid[c.y][c.x] !== TILE.ENTRANCE && grid[c.y][c.x] !== TILE.EXIT
     );
     if (inside.length === 0) { i--; continue; }
     for (const c of inside) grid[c.y][c.x] = tile;
@@ -403,13 +406,15 @@ function generateRoomDungeon(width, height, seed) {
     const cells = horizontalCorridor
       ? [{ x: pick.x, y: pick.y }, { x: pick.x, y: pick.y + 1 }]
       : [{ x: pick.x, y: pick.y }, { x: pick.x + 1, y: pick.y }];
-    for (const c of cells) {
-      if (c.x > 0 && c.x < width - 1 && c.y > 0 && c.y < height - 1) {
-        grid[c.y][c.x] = tile;
-      }
-    }
-    doors.push({ color: keyColors[i], cells });
-    const blocked = new Set(cells.map(c => c.y * width + c.x));
+    // Не перетираем ENTRANCE/EXIT (см. hybrid версию)
+    const safeCells = cells.filter(c =>
+      c.x > 0 && c.x < width - 1 && c.y > 0 && c.y < height - 1
+      && grid[c.y][c.x] !== TILE.ENTRANCE && grid[c.y][c.x] !== TILE.EXIT
+    );
+    if (safeCells.length === 0) { i--; continue; }
+    for (const c of safeCells) grid[c.y][c.x] = tile;
+    doors.push({ color: keyColors[i], cells: safeCells });
+    const blocked = new Set(safeCells.map(c => c.y * width + c.x));
     const safe = findReachableExcludingMulti(grid, sx, sy, blocked)
       .filter(c => Math.hypot(c.x - pick.x, c.y - pick.y) >= 5);
     if (safe.length) {
@@ -489,11 +494,16 @@ function generateCorridorMaze(width, height, seed = Date.now()) {
       if (!used.has(key)) { used.add(key); break; }
     }
     const tile = doorColors[i];
-    for (const c of pick.cells) grid[c.y][c.x] = tile;
-    doors.push({ color: keyColors[i], cells: pick.cells.slice() });
+    // Не перетираем ENTRANCE/EXIT
+    const safeCells = pick.cells.filter(c =>
+      grid[c.y][c.x] !== TILE.ENTRANCE && grid[c.y][c.x] !== TILE.EXIT
+    );
+    if (safeCells.length === 0) { i--; continue; }
+    for (const c of safeCells) grid[c.y][c.x] = tile;
+    doors.push({ color: keyColors[i], cells: safeCells.slice() });
     // ключ — в области, доступной из входа без этой двери; обязательно
     // НЕ рядом с ней самой (минимум 5 клеток), иначе подбор обесмысленный.
-    const blocked = new Set(pick.cells.map(c => c.y * width + c.x));
+    const blocked = new Set(safeCells.map(c => c.y * width + c.x));
     const safe = findReachableExcludingMulti(grid, sx, sy, blocked);
     const doorCenter = pick.cells[0];
     const MIN_KEY_DIST = 5;

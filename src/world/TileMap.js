@@ -25,6 +25,32 @@ export class TileMap {
     this._renderFloor();
     this._renderWalls();
     this._rebuildPhysics();
+    this._ensureEntranceExit();
+  }
+
+  // Safety-net: если по какой-то причине ENTRANCE/EXIT не оказались в grid
+  // (например, door placement перетёр), fallback на любой FLOOR-тайл. Иначе
+  // GameScene крашится на null.
+  _ensureEntranceExit() {
+    if (this.entrance && this.exit) return;
+    const fallback = [];
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        if (this.tiles[y][x] === TILE.FLOOR) fallback.push({ x, y });
+      }
+    }
+    if (!this.entrance) {
+      const c = fallback.shift() || { x: 1, y: 1 };
+      this.tiles[c.y][c.x] = TILE.ENTRANCE;
+      this.entrance = { x: c.x, y: c.y };
+      log('wall', 'WARN: entrance fallback', c);
+    }
+    if (!this.exit) {
+      const c = fallback.pop() || { x: this.width - 2, y: this.height - 2 };
+      this.tiles[c.y][c.x] = TILE.EXIT;
+      this.exit = { x: c.x, y: c.y };
+      log('wall', 'WARN: exit fallback', c);
+    }
   }
 
   _initSubGrid() {
