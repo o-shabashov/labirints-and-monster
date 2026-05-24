@@ -5,6 +5,7 @@ export const PICKUP_TYPE = {
   KEY_B:           'key_b',
   AMMO:            'ammo',
   ROCKET_LAUNCHER: 'rocket_launcher',
+  BOMB:            'bomb',
 };
 
 const TEXTURES = {
@@ -14,6 +15,7 @@ const TEXTURES = {
   key_b:           'key_b',
   ammo:            'pickup_ammo',
   rocket_launcher: 'pickup_rocket',
+  bomb:            'pickup_bomb',
 };
 
 export class Pickup {

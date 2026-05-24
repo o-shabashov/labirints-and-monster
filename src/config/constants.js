@@ -56,6 +56,18 @@ export const ROCKET_WALL_ERASE_RADIUS  = 36;    // erase стен — крупн
 export const WALL_CHAR_RIM_PX          = 6;     // ширина «обугленной» каймы вокруг дырки
 export const ROCKET_PLAYER_RECOIL      = 220;   // px/sec отдача игрока назад
 export const ROCKET_PLAYER_RECOIL_MS   = 140;   // длительность recoil — на это время Player.update пропускает свой setVelocity
+
+// Бомбы — расходный AoE-снаряд, бросается с фитилём 1.5с. Радиус взрыва
+// и erase'а заметно крупнее ракеты — это «тяжёлая артиллерия».
+export const BOMB_FUSE_MS              = 1500;
+export const BOMB_THROW_SPEED          = 280;   // начальная скорость броска
+export const BOMB_DRAG                 = 260;   // замедление, чтоб не улетала на весь экран
+export const BOMB_EXPLOSION_RADIUS     = 80;
+export const BOMB_WALL_ERASE_RADIUS    = 56;
+export const BOMB_DAMAGE               = 5;
+export const BOMB_AOE_DAMAGE           = 4;
+export const BOMB_MONSTER_KNOCKBACK    = 480;
+export const BOMB_AMMO_FROM_PICKUP     = 3;     // одна pickup-сумка = 3 бомбы
 export const ROCKET_MONSTER_KNOCKBACK  = 360;   // px/sec отброс врагов от центра
 export const CAMERA_SHAKE_MS           = 220;
 export const CAMERA_SHAKE_INTENSITY    = 0.012;

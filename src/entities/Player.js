@@ -42,6 +42,18 @@ export class Player {
     this.weaponXp = 0;
     this.hasRocketLauncher = false;
     this.nextRocketAt = 0;
+    this.bombsAmmo = 0;
+  }
+
+  addBombs(n) {
+    this.bombsAmmo = (this.bombsAmmo || 0) + n;
+  }
+
+  tryThrowBomb(now) {
+    if (this.bombsAmmo <= 0) return null;
+    if (!this.aim) return null;
+    this.bombsAmmo--;
+    return { x: this.aim.x, y: this.aim.y, ox: this.sprite.x, oy: this.sprite.y };
   }
 
   upgradeWeapon() {

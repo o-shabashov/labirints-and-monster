@@ -51,6 +51,13 @@ export class UIScene extends Phaser.Scene {
     this.rocketBar   = this.add.rectangle(470, 26, 32, 3, 0xff7043).setOrigin(0, 0);
     this.rocketBarBg.setVisible(false);
     this.rocketBar.setVisible(false);
+
+    // Бомбы — иконка + счётчик ammo. Скрыты пока ammo=0.
+    this.bombIcon = this.add.image(515, 14, 'pickup_bomb').setOrigin(0, 0.5);
+    this.bombText = this.add.text(540, 6, '', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#ffeb3b',
+    });
+    this.bombIcon.setVisible(false);
     // живые иконки ключей — спрайты flask_*. Заполняются в onUpdate.
     this.keyIcons = [];
     this.deviceIndicator = this.add.text(GAME_W - 12, 6, '', {
@@ -123,6 +130,11 @@ export class UIScene extends Phaser.Scene {
     if (state.mobTier != null) {
       this.mobLabel.setText(`Монстры ур.${state.mobTier}`);
       this.mobBar.width = 90 * (state.mobTierFraction ?? 0);
+    }
+    if (state.bombs != null) {
+      const n = state.bombs;
+      this.bombIcon.setVisible(n > 0);
+      this.bombText.setText(n > 0 ? `×${n}` : '');
     }
     if (state.rocket != null) {
       const has = !!state.rocket.has;

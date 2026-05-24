@@ -188,6 +188,23 @@ export class BootScene extends Phaser.Scene {
     rkx.closePath(); rkx.fill();
     this.textures.addCanvas('rocket', rkCv);
 
+    // Бомба — чёрный шар с фитилём и искрой сверху.
+    const bmSize = 16;
+    const bmCv = document.createElement('canvas');
+    bmCv.width = bmCv.height = bmSize;
+    const bmx = bmCv.getContext('2d');
+    bmx.fillStyle = '#1a1a1a';
+    bmx.beginPath();
+    bmx.arc(bmSize / 2, bmSize / 2 + 1, 6, 0, Math.PI * 2);
+    bmx.fill();
+    bmx.fillStyle = '#3a3a3a';
+    bmx.fillRect(bmSize / 2 - 1, bmSize / 2 - 3, 2, 4);   // штифт
+    bmx.fillStyle = '#8d6e63';
+    bmx.fillRect(bmSize / 2 - 1, bmSize / 2 - 6, 2, 3);   // фитиль
+    bmx.fillStyle = '#ffeb3b';
+    bmx.fillRect(bmSize / 2 - 1, 1, 2, 2);                 // искра
+    this.textures.addCanvas('pickup_bomb', bmCv);
+
     // Иконка ракетницы (pickup) — короткая трубка с орудийным «срезом».
     const plW = 28, plH = 16;
     const plCv = document.createElement('canvas');

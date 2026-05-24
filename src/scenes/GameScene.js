@@ -4,6 +4,8 @@ import {
   ROCKET_DAMAGE, ROCKET_AOE_DAMAGE, ROCKET_EXPLOSION_RADIUS,
   ROCKET_WALL_ERASE_RADIUS, ROCKET_MONSTER_KNOCKBACK,
   ROCKET_COOLDOWN_MS,
+  BOMB_AMMO_FROM_PICKUP, BOMB_EXPLOSION_RADIUS, BOMB_WALL_ERASE_RADIUS,
+  BOMB_AOE_DAMAGE, BOMB_MONSTER_KNOCKBACK,
   CAMERA_SHAKE_MS, CAMERA_SHAKE_INTENSITY,
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
@@ -35,6 +37,7 @@ import { MaskedOrc } from '../entities/monsters/MaskedOrc.js';
 import { Pickup, PICKUP_TYPE } from '../entities/Pickup.js';
 import { Bullet } from '../entities/Bullet.js';
 import { Rocket } from '../entities/Rocket.js';
+import { Bomb } from '../entities/Bomb.js';
 import { DEBUG } from '../config/debug.js';
 import { log } from '../systems/Logger.js';
 import { Door } from '../entities/Door.js';
@@ -55,6 +58,7 @@ export class GameScene extends Phaser.Scene {
     this.gameState = { effects: [] };
     this.bullets = [];
     this.rockets = [];
+    this.bombs = [];
     this.enemyProjectiles = [];
     this.lure = null;
     this.lastMoveDir = { x: 1, y: 0 };
@@ -135,8 +139,8 @@ export class GameScene extends Phaser.Scene {
     this.pickups = [];
     this.chests = [];
 
-    // Ракетница — стартовый pickup в 2-3 тайлах от entrance.
-    // Игрок видит её сразу при появлении.
+    // Ракетница и сумка бомб — стартовые pickups в 2-3 тайлах от entrance.
+    // Игрок видит их сразу при появлении.
     {
       const ent = this.map.entrance;
       const candidates = [];
@@ -149,9 +153,15 @@ export class GameScene extends Phaser.Scene {
           if (this.map.tiles[ty][tx] === TILE.FLOOR) candidates.push({ x: tx, y: ty });
         }
       }
-      if (candidates.length) {
-        const c = candidates[Math.floor(Math.random() * candidates.length)];
-        const w = this.map.tileToWorld(c.x, c.y);
+      // Перемешиваем — pickups берут случайные позиции из общего пула
+      for (let i = candidates.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+      }
+      const rocketSpot = candidates.shift();
+      const bombSpot = candidates.shift();
+      if (rocketSpot) {
+        const w = this.map.tileToWorld(rocketSpot.x, rocketSpot.y);
         const rp = new Pickup(this, w.x, w.y, PICKUP_TYPE.ROCKET_LAUNCHER);
         this.physics.add.overlap(this.player.sprite, rp.sprite, () => {
           if (!rp.sprite.active) return;
@@ -161,6 +171,18 @@ export class GameScene extends Phaser.Scene {
           this.showToast?.('Ракетница! ПКМ / Q', '#ff7043');
         });
         this.pickups.push(rp);
+      }
+      if (bombSpot) {
+        const w = this.map.tileToWorld(bombSpot.x, bombSpot.y);
+        const bp = new Pickup(this, w.x, w.y, PICKUP_TYPE.BOMB);
+        this.physics.add.overlap(this.player.sprite, bp.sprite, () => {
+          if (!bp.sprite.active) return;
+          bp.sprite.destroy();
+          this.player.addBombs(BOMB_AMMO_FROM_PICKUP);
+          this.sound.pickup();
+          this.showToast?.(`Бомбы +${BOMB_AMMO_FROM_PICKUP}! F`, '#ffeb3b');
+        });
+        this.pickups.push(bp);
       }
     }
 
@@ -370,6 +392,22 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // Бомба — edge-кнопка F / LB. Бросается с замедлением, через 1.5с бахает.
+    if (input.bomb) {
+      log('input', 'bomb pressed');
+      const shot = this.player.tryThrowBomb(this.time.now);
+      if (!shot) log('bomb', 'tryThrowBomb returned null', {
+        ammo: this.player.bombsAmmo, aim: this.player.aim,
+      });
+      if (shot) {
+        log('bomb', 'throw', { ammoLeft: this.player.bombsAmmo });
+        const b = new Bomb(this, shot.ox, shot.oy, shot.x, shot.y);
+        this.physics.add.collider(b.sprite, this.map.walls);
+        this.bombs.push(b);
+        this.sound.pickup();   // звук броска — заменим если будет
+      }
+    }
+
     // bullet lifetime + homing turn — пропускаем мёртвых, их sprite уничтожен
     const now = this.time.now;
     for (const b of this.bullets) {
@@ -381,6 +419,18 @@ export class GameScene extends Phaser.Scene {
       if (!r.dead) r.update(now);
     }
     this.rockets = this.rockets.filter(r => !r.dead);
+
+    for (const b of this.bombs) {
+      if (!b.dead) b.update(now);
+    }
+    // отдельный проход — если бомба только что взорвалась, дёрнем explosion
+    for (const b of this.bombs) {
+      if (b.exploded && b.dead && !b._handled) {
+        b._handled = true;
+        this.explodeBomb(b.detonateX, b.detonateY);
+      }
+    }
+    this.bombs = this.bombs.filter(b => !b.dead);
 
     for (const m of this.monsters) m.update(delta, this.player, this.map);
     this.tickSpawns();
@@ -516,6 +566,7 @@ export class GameScene extends Phaser.Scene {
               (this.player.nextRocketAt - this.time.now) / ROCKET_COOLDOWN_MS))
           : 0,
       },
+      bombs: this.player.bombsAmmo || 0,
     });
   }
 
@@ -790,18 +841,23 @@ export class GameScene extends Phaser.Scene {
     };
   }
 
-  // Взрыв ракеты в (x,y): тряска камеры, частицы, AoE damage+knockback
-  // монстрам, разрушение стен 1-3 рваными кратерами.
-  explode(worldX, worldY) {
-    log('rocket', 'explode', { worldX, worldY });
-    this.cameras.main.shake(CAMERA_SHAKE_MS, CAMERA_SHAKE_INTENSITY);
-    // 1-3 случайных кратера со смещением и разным радиусом → асимметричная
-    // рваная дыра вместо идеального круга.
+  // Взрыв в (x,y): тряска, частицы, AoE damage+knockback монстрам,
+  // разрушение стен 1-3 рваными кратерами. opts позволяют параметризовать
+  // источник (ракета vs бомба) — у бомбы радиус и урон крупнее.
+  explode(worldX, worldY, opts = {}) {
+    const eraseR     = opts.eraseRadius     ?? ROCKET_WALL_ERASE_RADIUS;
+    const explRadius = opts.explosionRadius ?? ROCKET_EXPLOSION_RADIUS;
+    const aoeDmg     = opts.aoeDamage       ?? ROCKET_AOE_DAMAGE;
+    const knockback  = opts.knockback       ?? ROCKET_MONSTER_KNOCKBACK;
+    const shakeIns   = opts.shakeIntensity  ?? CAMERA_SHAKE_INTENSITY;
+    const shakeMs    = opts.shakeMs         ?? CAMERA_SHAKE_MS;
+    log(opts.source || 'rocket', 'explode', { worldX, worldY, eraseR, explRadius });
+    this.cameras.main.shake(shakeMs, shakeIns);
     const craters = 1 + Math.floor(Math.random() * 3);
     for (let i = 0; i < craters; i++) {
-      const r = ROCKET_WALL_ERASE_RADIUS * (0.7 + Math.random() * 0.6);  // 70-130%
+      const r = eraseR * (0.7 + Math.random() * 0.6);
       const ang = Math.random() * Math.PI * 2;
-      const off = i === 0 ? 0 : Math.random() * (ROCKET_WALL_ERASE_RADIUS * 0.6);
+      const off = i === 0 ? 0 : Math.random() * (eraseR * 0.6);
       this.map.damageAt(
         worldX + Math.cos(ang) * off,
         worldY + Math.sin(ang) * off,
@@ -809,12 +865,12 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
-    // Частицы — 24 кругов explosion_particle разлетаются и затухают.
-    // depth=11 — поверх fog (9, 10), чтобы вспышка не скрывалась туманом.
+    // Частицы — разлетаются и затухают. Количество и дальность зависят
+    // от размера взрыва: бомба даёт более крупный фейерверк.
     const N = 24;
     for (let i = 0; i < N; i++) {
       const ang = (Math.PI * 2 * i) / N + Math.random() * 0.5;
-      const dist = 14 + Math.random() * (ROCKET_EXPLOSION_RADIUS * 1.3);
+      const dist = 14 + Math.random() * (explRadius * 1.3);
       const tx = worldX + Math.cos(ang) * dist;
       const ty = worldY + Math.sin(ang) * dist;
       const p = this.add.image(worldX, worldY, 'explosion_particle')
@@ -830,7 +886,6 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => p.destroy(),
       });
     }
-    // Центральная вспышка — яркая, крупная, выше тумана.
     const flash = this.add.image(worldX, worldY, 'explosion_particle')
       .setDepth(11).setScale(0.5);
     this.tweens.add({
@@ -841,13 +896,12 @@ export class GameScene extends Phaser.Scene {
       ease: 'Cubic.easeOut',
       onComplete: () => flash.destroy(),
     });
-    // Shockwave — расширяющееся жёлтое кольцо.
     const shock = this.add.circle(worldX, worldY, 4, 0xffd54f, 0)
       .setStrokeStyle(3, 0xffeb3b)
       .setDepth(11);
     this.tweens.add({
       targets: shock,
-      radius: ROCKET_EXPLOSION_RADIUS * 1.6,
+      radius: explRadius * 1.6,
       alpha: { from: 1, to: 0 },
       duration: 360,
       ease: 'Cubic.easeOut',
@@ -855,20 +909,16 @@ export class GameScene extends Phaser.Scene {
     });
 
     // AoE damage + knockback монстрам в радиусе
-    const r2 = ROCKET_EXPLOSION_RADIUS * ROCKET_EXPLOSION_RADIUS;
+    const r2 = explRadius * explRadius;
     for (const m of this.monsters.slice()) {
       if (!m.sprite || !m.sprite.active) continue;
       const dx = m.sprite.x - worldX, dy = m.sprite.y - worldY;
       if (dx * dx + dy * dy > r2) continue;
       const dist = Math.hypot(dx, dy) || 1;
-      // knockback наружу
       if (m.sprite.body) {
-        m.sprite.body.setVelocity(
-          (dx / dist) * ROCKET_MONSTER_KNOCKBACK,
-          (dy / dist) * ROCKET_MONSTER_KNOCKBACK,
-        );
+        m.sprite.body.setVelocity((dx / dist) * knockback, (dy / dist) * knockback);
       }
-      if (m.takeDamage(ROCKET_AOE_DAMAGE, worldX, worldY)) {
+      if (m.takeDamage(aoeDmg, worldX, worldY)) {
         this.sound.monsterKilled();
         this.stats.monstersKilled++;
         this.player.addWeaponXp();
@@ -876,6 +926,19 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.sound.explosion();
+  }
+
+  // Взрыв бомбы — те же эффекты, но крупнее радиус и сильнее knockback.
+  explodeBomb(worldX, worldY) {
+    this.explode(worldX, worldY, {
+      source: 'bomb',
+      eraseRadius:     BOMB_WALL_ERASE_RADIUS,
+      explosionRadius: BOMB_EXPLOSION_RADIUS,
+      aoeDamage:       BOMB_AOE_DAMAGE,
+      knockback:       BOMB_MONSTER_KNOCKBACK,
+      shakeIntensity:  CAMERA_SHAKE_INTENSITY * 1.3,
+      shakeMs:         CAMERA_SHAKE_MS + 100,
+    });
   }
 
   throwLure() {
