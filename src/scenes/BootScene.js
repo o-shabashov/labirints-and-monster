@@ -129,6 +129,22 @@ export class BootScene extends Phaser.Scene {
     cx.fillRect(0, 0, size, size);
     this.textures.addCanvas('vignette', cv);
 
+    // Brush для erase'а стен от попаданий пуль — soft circle ~24px с резким
+    // центром (alpha 1) и плавным схождением к 0. Радиус совпадает с
+    // WALL_ERASE_RADIUS_PX (constants.js). Маленький размер — чтобы дырки были
+    // пиксельные, без расплывчатых краев.
+    const wdSize = 32;
+    const wdCv = document.createElement('canvas');
+    wdCv.width = wdCv.height = wdSize;
+    const wdcx = wdCv.getContext('2d');
+    const wdgrad = wdcx.createRadialGradient(wdSize/2, wdSize/2, 0, wdSize/2, wdSize/2, wdSize/2);
+    wdgrad.addColorStop(0.0, 'rgba(255,255,255,1)');
+    wdgrad.addColorStop(0.6, 'rgba(255,255,255,1)');
+    wdgrad.addColorStop(1.0, 'rgba(255,255,255,0)');
+    wdcx.fillStyle = wdgrad;
+    wdcx.fillRect(0, 0, wdSize, wdSize);
+    this.textures.addCanvas('wall_damage_brush', wdCv);
+
     // soft_circle — белый круг с alpha-градиентом, используется FogOfWar как
     // brush для накопительной explored-памяти и mask текущего зрения.
     const sSize = radius * 2;

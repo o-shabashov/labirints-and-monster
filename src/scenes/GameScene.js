@@ -1,5 +1,6 @@
 import {
   TILE, TILE_SIZE, GRID_W, GRID_H, GAME_W, GAME_H, TOPBAR_H, VISION_RADIUS_TILES,
+  isBlockingTile, BULLET_DESTROYS_WALLS,
   POISON_TICK_MS, POISON_TICKS,
   SLOW_DURATION_MS, BLINDNESS_DURATION_MS,
   COMPASS_DURATION_MS, LURE_DURATION_MS, LURE_THROW_TILES,
@@ -253,7 +254,10 @@ export class GameScene extends Phaser.Scene {
           dx = tdx / m; dy = tdy / m;
         }
         const b = new Bullet(this, shot.ox, shot.oy, dx, dy, target);
-        this.physics.add.collider(b.sprite, this.map.walls, () => b.kill());
+        this.physics.add.collider(b.sprite, this.map.walls, () => {
+          if (BULLET_DESTROYS_WALLS) this.map.damageAt(b.sprite.x, b.sprite.y);
+          b.kill();
+        });
         const dmg = this.player.bulletDamage(this);
         for (const m of this.monsters) {
           if (!m.sprite.active) continue;
@@ -659,7 +663,7 @@ export class GameScene extends Phaser.Scene {
 
   countFloorCells() {
     let n = 0;
-    for (const row of this.map.tiles) for (const t of row) if (t !== TILE.WALL) n++;
+    for (const row of this.map.tiles) for (const t of row) if (!isBlockingTile(t)) n++;
     return n;
   }
 
@@ -669,7 +673,7 @@ export class GameScene extends Phaser.Scene {
     let n = 0;
     for (let y = 0; y < this.fog.explored.length; y++) {
       for (let x = 0; x < this.fog.explored[0].length; x++) {
-        if (this.fog.explored[y][x] && this.map.tiles[y][x] !== TILE.WALL) n++;
+        if (this.fog.explored[y][x] && !isBlockingTile(this.map.tiles[y][x])) n++;
       }
     }
     return Math.min(100, Math.round((n / this.stats.totalCells) * 100));
@@ -714,7 +718,7 @@ function findDeadEnds(tiles) {
       if (tiles[y][x] !== TILE.FLOOR) continue;
       let openSides = 0;
       for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-        if (tiles[y + dy][x + dx] !== TILE.WALL) openSides++;
+        if (!isBlockingTile(tiles[y + dy][x + dx])) openSides++;
       }
       if (openSides === 1) result.push({ x, y });
     }

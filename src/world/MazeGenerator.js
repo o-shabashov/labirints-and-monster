@@ -159,9 +159,36 @@ function findReachableExcluding(grid, sx, sy, blockX, blockY) {
 // внутри). 'corridor' и 'rooms' доступны как чистые варианты.
 export function generateMaze(width, height, seed = Date.now(), style = null) {
   if (!style) style = 'hybrid';
-  if (style === 'rooms') return generateRoomDungeon(width, height, seed);
-  if (style === 'corridor') return generateCorridorMaze(width, height, seed);
-  return generateHybridDungeon(width, height, seed);
+  let result;
+  if (style === 'rooms') result = generateRoomDungeon(width, height, seed);
+  else if (style === 'corridor') result = generateCorridorMaze(width, height, seed);
+  else result = generateHybridDungeon(width, height, seed);
+  markSolidWalls(result.grid, result.doors);
+  return result;
+}
+
+// Помечает неразрушимые стены: внешний периметр + клетки, примыкающие к
+// дверям. Так maze сохраняет смысл при разрушаемых стенах — нельзя пробить
+// границу карты или обойти дверь по soft-стенке вокруг неё.
+function markSolidWalls(grid, doors) {
+  const h = grid.length, w = grid[0].length;
+  for (let x = 0; x < w; x++) {
+    if (grid[0][x]     === TILE.WALL) grid[0][x]     = TILE.SOLID_WALL;
+    if (grid[h - 1][x] === TILE.WALL) grid[h - 1][x] = TILE.SOLID_WALL;
+  }
+  for (let y = 0; y < h; y++) {
+    if (grid[y][0]     === TILE.WALL) grid[y][0]     = TILE.SOLID_WALL;
+    if (grid[y][w - 1] === TILE.WALL) grid[y][w - 1] = TILE.SOLID_WALL;
+  }
+  for (const d of (doors || [])) {
+    for (const cell of d.cells) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cell.x + dx, ny = cell.y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        if (grid[ny][nx] === TILE.WALL) grid[ny][nx] = TILE.SOLID_WALL;
+      }
+    }
+  }
 }
 
 // Hybrid: сначала прокладываем corridor-maze step=3 (узкие проходы +

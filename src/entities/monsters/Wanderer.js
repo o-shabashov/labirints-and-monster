@@ -2,7 +2,7 @@ import { Monster } from '../Monster.js';
 import { bfsNextStep } from '../../systems/PathFinding.js';
 import {
   TILE_SIZE, PLAYER_SPEED,
-  WANDERER_VISION_TILES, WANDERER_LOSE_INTEREST_MS, TILE,
+  WANDERER_VISION_TILES, WANDERER_LOSE_INTEREST_MS, TILE, isBlockingTile,
 } from '../../config/constants.js';
 
 const REPATH_MS = 250;
@@ -30,7 +30,7 @@ export class Wanderer extends Monster {
     for (let i = 1; i < steps; i++) {
       const x = Math.round(mt.x - (dx * i / steps));
       const y = Math.round(mt.y - (dy * i / steps));
-      if (map.tiles[y][x] === TILE.WALL) return false;
+      if (isBlockingTile(map.tiles[y][x])) return false;
     }
     return true;
   }

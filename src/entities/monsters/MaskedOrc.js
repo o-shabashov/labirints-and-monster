@@ -1,6 +1,6 @@
 import { Monster } from '../Monster.js';
 import { bfsNextStep } from '../../systems/PathFinding.js';
-import { PLAYER_SPEED, TILE_SIZE, WANDERER_VISION_TILES, WANDERER_LOSE_INTEREST_MS, TILE } from '../../config/constants.js';
+import { PLAYER_SPEED, TILE_SIZE, WANDERER_VISION_TILES, WANDERER_LOSE_INTEREST_MS, TILE, isBlockingTile } from '../../config/constants.js';
 
 const REPATH_MS = 260;
 const WANDER_PICK_MS = 1400;
@@ -28,7 +28,7 @@ export class MaskedOrc extends Monster {
     for (let i = 1; i < steps; i++) {
       const x = Math.round(mt.x - (dx * i / steps));
       const y = Math.round(mt.y - (dy * i / steps));
-      if (map.tiles[y][x] === TILE.WALL) return false;
+      if (isBlockingTile(map.tiles[y][x])) return false;
     }
     return true;
   }

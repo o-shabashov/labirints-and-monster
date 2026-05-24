@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { generateMaze } from '../src/world/MazeGenerator.js';
-import { TILE } from '../src/config/constants.js';
+import { TILE, isBlockingTile } from '../src/config/constants.js';
 
 test('generateMaze: returns 2D grid of given size', () => {
   const { grid } = generateMaze(31, 21, 42);
@@ -9,15 +9,23 @@ test('generateMaze: returns 2D grid of given size', () => {
   assert.equal(grid[0].length, 31);
 });
 
-test('generateMaze: borders are all walls', () => {
+test('generateMaze: borders are all blocking walls', () => {
   const { grid } = generateMaze(31, 21, 42);
   for (let x = 0; x < 31; x++) {
-    assert.equal(grid[0][x], TILE.WALL, `top row x=${x}`);
-    assert.equal(grid[20][x], TILE.WALL, `bottom row x=${x}`);
+    assert.ok(isBlockingTile(grid[0][x]), `top row x=${x}`);
+    assert.ok(isBlockingTile(grid[20][x]), `bottom row x=${x}`);
   }
   for (let y = 0; y < 21; y++) {
-    assert.equal(grid[y][0], TILE.WALL, `left col y=${y}`);
-    assert.equal(grid[y][30], TILE.WALL, `right col y=${y}`);
+    assert.ok(isBlockingTile(grid[y][0]), `left col y=${y}`);
+    assert.ok(isBlockingTile(grid[y][30]), `right col y=${y}`);
+  }
+});
+
+test('generateMaze: borders are SOLID_WALL (non-destructible)', () => {
+  const { grid } = generateMaze(31, 21, 42);
+  for (let x = 0; x < 31; x++) {
+    assert.equal(grid[0][x],  TILE.SOLID_WALL, `top row x=${x}`);
+    assert.equal(grid[20][x], TILE.SOLID_WALL, `bottom row x=${x}`);
   }
 });
 
@@ -50,15 +58,15 @@ test('generateMaze: all floor cells are reachable from entrance', () => {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= grid[0].length || ny >= grid.length) continue;
       if (visited[ny][nx]) continue;
-      if (grid[ny][nx] === TILE.WALL) continue;
+      if (isBlockingTile(grid[ny][nx])) continue;
       visited[ny][nx] = true;
       reachable++;
       queue.push([nx, ny]);
     }
   }
-  // подсчёт всех non-wall клеток (включая двери)
+  // подсчёт всех non-blocking клеток (включая двери)
   let nonWall = 0;
-  for (const row of grid) for (const t of row) if (t !== TILE.WALL) nonWall++;
+  for (const row of grid) for (const t of row) if (!isBlockingTile(t)) nonWall++;
   assert.equal(reachable, nonWall, 'all non-wall cells must be reachable from entrance');
 });
 

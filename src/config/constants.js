@@ -23,14 +23,27 @@ export const COLOR = {
 };
 
 export const TILE = {
-  FLOOR:    0,
-  WALL:     1,
-  ENTRANCE: 2,
-  EXIT:     3,
-  DOOR_R:   10,
-  DOOR_G:   11,
-  DOOR_B:   12,
+  FLOOR:      0,
+  WALL:       1,   // разрушаемая стена
+  ENTRANCE:   2,
+  EXIT:       3,
+  SOLID_WALL: 4,   // неразрушаемая (внешняя рамка, door-frames)
+  DOOR_R:     10,
+  DOOR_G:     11,
+  DOOR_B:     12,
 };
+
+// Любая «непроходимая» стена — обычная WALL или неразрушимая SOLID_WALL.
+// Использовать для LOS, pathfinding-проверок, монстр-AI.
+export function isBlockingTile(t) {
+  return t === TILE.WALL || t === TILE.SOLID_WALL;
+}
+
+// Разрушаемость стен (hybrid pixel-mask + sub-tile физика).
+// WALL_SUB — деление каждого тайла на NxN под-клеток для физики (4 → 8px).
+export const WALL_SUB                  = 4;
+export const WALL_ERASE_RADIUS_PX      = 10;   // радиус erase-кружка от попадания пули
+export const BULLET_DESTROYS_WALLS     = true; // глобальный switch на случай отладки
 
 export const PLAYER_SPEED = 210;   // px/sec — чуть быстрее, чтобы не «тащиться»
 

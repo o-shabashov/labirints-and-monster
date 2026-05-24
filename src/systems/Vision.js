@@ -1,4 +1,4 @@
-import { TILE } from '../config/constants.js';
+import { isBlockingTile } from '../config/constants.js';
 
 // Грубая line-of-sight по сетке: дискретизируем отрезок (x0,y0)→(x1,y1) равными шагами
 // и проверяем, попадает ли хоть один промежуточный тайл в стену. Стартовый и конечный
@@ -12,7 +12,7 @@ export function hasLineOfSight(tiles, x0, y0, x1, y1) {
     const x = Math.round(x0 + (dx * i) / steps);
     const y = Math.round(y0 + (dy * i) / steps);
     const row = tiles[y];
-    if (row && row[x] === TILE.WALL) return false;
+    if (row && isBlockingTile(row[x])) return false;
   }
   return true;
 }
