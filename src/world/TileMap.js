@@ -168,9 +168,13 @@ export class TileMap {
     }
     if (!touched) return false;
 
-    // Erase визуала. Brush — soft 32×32 круг, erase накопителен.
+    // Erase визуала. Brush 32×32 даёт «жёсткий» круг ~16px радиусом при
+    // scale=1. Чтобы визуальная дырка совпадала с обнулёнными sub-cells,
+    // масштабируем brush пропорционально запрошенному radiusPx.
+    const brushScale = radiusPx / 14;
     const eraseImg = this.scene.add.image(worldX, worldY, 'wall_damage_brush')
       .setOrigin(0.5)
+      .setScale(brushScale)
       .setVisible(false);
     this.wallsRT.erase(eraseImg);
     eraseImg.destroy();

@@ -327,6 +327,14 @@ export class GameScene extends Phaser.Scene {
           r.kill();
         };
         this.physics.add.collider(r.sprite, this.map.walls, trigger);
+        // Двери тоже останавливают ракету и взрываются. Сама дверь не
+        // разрушается (door-frame вокруг — SOLID_WALL), но взрыв задевает
+        // монстров рядом и тряску камеры даёт.
+        for (const d of this.doors) {
+          for (const zone of d.bodies) {
+            this.physics.add.collider(r.sprite, zone, trigger);
+          }
+        }
         for (const m of this.monsters) {
           if (!m.sprite.active) continue;
           this.physics.add.overlap(r.sprite, m.sprite, () => {
@@ -762,40 +770,66 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Взрыв ракеты в (x,y): тряска камеры, частицы, AoE damage+knockback
-  // монстрам, разрушение стен в большом радиусе.
+  // монстрам, разрушение стен 1-3 рваными кратерами.
   explode(worldX, worldY) {
     this.cameras.main.shake(CAMERA_SHAKE_MS, CAMERA_SHAKE_INTENSITY);
-    this.map.damageAt(worldX, worldY, ROCKET_WALL_ERASE_RADIUS);
+    // 1-3 случайных кратера со смещением и разным радиусом → асимметричная
+    // рваная дыра вместо идеального круга.
+    const craters = 1 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < craters; i++) {
+      const r = ROCKET_WALL_ERASE_RADIUS * (0.7 + Math.random() * 0.6);  // 70-130%
+      const ang = Math.random() * Math.PI * 2;
+      const off = i === 0 ? 0 : Math.random() * (ROCKET_WALL_ERASE_RADIUS * 0.6);
+      this.map.damageAt(
+        worldX + Math.cos(ang) * off,
+        worldY + Math.sin(ang) * off,
+        r,
+      );
+    }
 
-    // Частицы — 12 кругов explosion_particle разлетаются и затухают.
-    for (let i = 0; i < 12; i++) {
-      const ang = (Math.PI * 2 * i) / 12 + Math.random() * 0.4;
-      const dist = 12 + Math.random() * (ROCKET_EXPLOSION_RADIUS - 12);
+    // Частицы — 24 кругов explosion_particle разлетаются и затухают.
+    // depth=11 — поверх fog (9, 10), чтобы вспышка не скрывалась туманом.
+    const N = 24;
+    for (let i = 0; i < N; i++) {
+      const ang = (Math.PI * 2 * i) / N + Math.random() * 0.5;
+      const dist = 14 + Math.random() * (ROCKET_EXPLOSION_RADIUS * 1.3);
       const tx = worldX + Math.cos(ang) * dist;
       const ty = worldY + Math.sin(ang) * dist;
       const p = this.add.image(worldX, worldY, 'explosion_particle')
-        .setDepth(6)
-        .setScale(0.6 + Math.random() * 0.5);
+        .setDepth(11)
+        .setScale(0.8 + Math.random() * 0.8);
       this.tweens.add({
         targets: p,
         x: tx, y: ty,
         alpha: { from: 1, to: 0 },
-        scale: { from: 1.6, to: 0.2 },
-        duration: 360 + Math.random() * 160,
+        scale: { from: 2.2, to: 0.2 },
+        duration: 380 + Math.random() * 220,
         ease: 'Cubic.easeOut',
         onComplete: () => p.destroy(),
       });
     }
-    // центральная вспышка — большой однократный flash
+    // Центральная вспышка — яркая, крупная, выше тумана.
     const flash = this.add.image(worldX, worldY, 'explosion_particle')
-      .setDepth(6).setScale(0.4);
+      .setDepth(11).setScale(0.5);
     this.tweens.add({
       targets: flash,
-      scale: { from: 0.6, to: 4 },
+      scale: { from: 0.8, to: 6 },
       alpha: { from: 1, to: 0 },
-      duration: 280,
+      duration: 320,
       ease: 'Cubic.easeOut',
       onComplete: () => flash.destroy(),
+    });
+    // Shockwave — расширяющееся жёлтое кольцо.
+    const shock = this.add.circle(worldX, worldY, 4, 0xffd54f, 0)
+      .setStrokeStyle(3, 0xffeb3b)
+      .setDepth(11);
+    this.tweens.add({
+      targets: shock,
+      radius: ROCKET_EXPLOSION_RADIUS * 1.6,
+      alpha: { from: 1, to: 0 },
+      duration: 360,
+      ease: 'Cubic.easeOut',
+      onComplete: () => shock.destroy(),
     });
 
     // AoE damage + knockback монстрам в радиусе
