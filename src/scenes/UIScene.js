@@ -100,7 +100,10 @@ export class UIScene extends Phaser.Scene {
   }
   onUpdate(state) {
     if (state.hp != null) {
-      this.hpText.setText('HP: ' + '♥'.repeat(state.hp) + '♡'.repeat(PLAYER_MAX_HP - state.hp));
+      // hp может уйти ниже 0 в момент смерти (до того как _gameOver()
+      // запустит overlay). String.repeat(-1) кидает RangeError.
+      const hp = Math.max(0, Math.min(PLAYER_MAX_HP, state.hp | 0));
+      this.hpText.setText('HP: ' + '♥'.repeat(hp) + '♡'.repeat(PLAYER_MAX_HP - hp));
     }
     if (state.stamina != null) this.staminaBar.width = 120 * (state.stamina / 100);
     if (state.keys != null) {

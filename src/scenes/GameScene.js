@@ -56,6 +56,11 @@ export class GameScene extends Phaser.Scene {
     // на следующий уровень. На первом запуске data пустая.
     this.currentLevel = (data && data.level) || 1;
     this._carry = (data && data.carry) || null;
+    // ВАЖНО: Phaser reusing same scene instance при scene.start. Поля типа
+    // _reachingExit / _gameOverShown остаются с прошлого запуска. Без
+    // сброса второй exit/death silent ignore'ятся.
+    this._reachingExit = false;
+    this._gameOverShown = false;
   }
 
   create() {
