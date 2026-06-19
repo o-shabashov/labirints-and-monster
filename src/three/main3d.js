@@ -354,6 +354,10 @@ function animate() {
   const bob = walking ? Math.sin(walkPhase) * 7 : 0;
   viewmodelEl.style.transform = `translateY(${bob + vmRecoil}px)`;
   torch.intensity = 2.2 + Math.sin(now * 0.012) * 0.2 + (Math.random() - 0.5) * 0.12;
+  // мерцание настенных факелов
+  if (world && world.torchLights) {
+    for (const L of world.torchLights) L.intensity = L.userData.baseI + (Math.random() - 0.5) * 0.4;
+  }
 
   renderer.render(scene, camera);
   if (shakeT > 0) { camera.position.x -= sx; camera.position.y -= sy; camera.position.z -= sz; }

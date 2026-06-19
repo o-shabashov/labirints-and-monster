@@ -118,6 +118,45 @@ export function buildWorld(scene, grid) {
     return changed;
   }
 
+  // ---- Факелы по карте: свет + светящийся орб на стенах ----
+  // Кандидаты — floor-тайлы, примыкающие к стене. Берём с минимальным
+  // расстоянием между факелами, чтобы свет был распределён, а не кучей.
+  const torchCands = [];
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      if (grid[y][x] !== TILE.FLOOR) continue;
+      // сторона со стеной → к ней прижмём орб
+      let wallDir = null;
+      if (isBlockingTile(grid[y - 1][x])) wallDir = { dx: 0, dz: -1 };
+      else if (isBlockingTile(grid[y + 1][x])) wallDir = { dx: 0, dz: 1 };
+      else if (isBlockingTile(grid[y][x - 1])) wallDir = { dx: -1, dz: 0 };
+      else if (isBlockingTile(grid[y][x + 1])) wallDir = { dx: 1, dz: 0 };
+      if (wallDir) torchCands.push({ x, y, wallDir });
+    }
+  }
+  // прорежаем: min расстояние 4 тайла, максимум 14 факелов
+  const torchLights = [];
+  const placed = [];
+  for (const c of torchCands) {
+    if (placed.length >= 14) break;
+    if (placed.some(p => Math.hypot(p.x - c.x, p.y - c.y) < 4)) continue;
+    if (Math.random() < 0.45) continue;   // разрядим случайно
+    placed.push(c);
+    const ox = c.x + 0.5 + c.wallDir.dx * 0.38;
+    const oz = c.y + 0.5 + c.wallDir.dz * 0.38;
+    const orb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.07, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffb866 }),
+    );
+    orb.position.set(ox, 0.62, oz);
+    group.add(orb);
+    const light = new THREE.PointLight(0xffa64d, 1.3, 4.5, 1.4);
+    light.position.set(ox, 0.62, oz);
+    light.userData.baseI = 1.3;
+    group.add(light);
+    torchLights.push(light);
+  }
+
   // ---- Маркер выхода — светящийся жёлтый столб ----
   let exit = null;
   for (let y = 0; y < h && !exit; y++) {
@@ -137,5 +176,5 @@ export function buildWorld(scene, grid) {
     group.add(exitLight);
   }
 
-  return { group, wallMesh, solidMesh, exit, damageWall };
+  return { group, wallMesh, solidMesh, exit, damageWall, torchLights };
 }
