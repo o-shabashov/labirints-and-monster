@@ -26,6 +26,18 @@
     }
     #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
     #crosshair::after  { top: 8px; left: 0; height: 2px; width: 18px; }
+    #hud {
+      position: fixed; left: 14px; top: 12px; z-index: 5; display: none;
+      font-family: monospace; font-size: 20px; color: #ff5252;
+      text-shadow: 0 0 4px #000; pointer-events: none;
+    }
+    #killcnt { color: #cdd6e0; font-size: 15px; margin-left: 16px; }
+    /* красная вспышка при получении урона */
+    #flash {
+      position: fixed; inset: 0; z-index: 4; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(255,0,0,0.55) 100%);
+      opacity: 0; transition: opacity 0.12s ease-out;
+    }
   </style>
   <script type="importmap">
   {
@@ -39,12 +51,14 @@
 <body>
   <canvas id="c"></canvas>
   <div id="crosshair"></div>
+  <div id="hud">HP: <span id="hp">♥♥♥</span><span id="killcnt"></span></div>
+  <div id="flash"></div>
   <div id="overlay">
     <h1>LABIRINTS 3D</h1>
     <p>WASD — движение · Мышь — обзор · Shift — спринт</p>
     <p>ЛКМ — стрельба · Esc — освободить курсор</p>
     <p class="go">Кликни, чтобы войти</p>
   </div>
-  <script type="module" src="./src/three/main3d.js?v=3d1"></script>
+  <script type="module" src="./src/three/main3d.js?v=3d2"></script>
 </body>
 </html>

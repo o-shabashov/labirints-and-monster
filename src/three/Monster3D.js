@@ -1,0 +1,104 @@
+import * as THREE from 'three';
+import { bfsNextStep } from '../systems/PathFinding.js';
+
+// Монстр в 3D — billboard-спрайт (THREE.Sprite всегда повёрнут к камере).
+// Использует те же 0x72-текстуры что и 2D-версия и тот же BFS-pathfinding
+// по 2D-сетке. Движение — к центру следующего тайла на пути к игроку.
+
+const REPATH_MS = 280;
+const _loader = new THREE.TextureLoader();
+const _texCache = new Map();
+
+function spriteTexture(path) {
+  if (_texCache.has(path)) return _texCache.get(path);
+  const tex = _loader.load(path);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  _texCache.set(path, tex);
+  return tex;
+}
+
+export class Monster3D {
+  constructor(scene, grid, opts) {
+    this.scene = scene;
+    this.grid = grid;
+    this.h = grid.length;
+    this.w = grid[0].length;
+    this.speed = opts.speed;          // units/sec
+    this.hp = opts.hp ?? 1;
+    this.dead = false;
+
+    const mat = new THREE.SpriteMaterial({
+      map: spriteTexture(opts.texture),
+      transparent: true,
+      alphaTest: 0.5,
+    });
+    this.sprite = new THREE.Sprite(mat);
+    const s = opts.scale ?? 0.7;
+    this.sprite.scale.set(s, s * 1.3, 1);   // выше чем шире — человекоформа
+    this.sprite.position.set(opts.tx + 0.5, s * 0.65, opts.ty + 0.5);
+    scene.add(this.sprite);
+
+    this.target = null;
+    this.repathMs = 0;
+  }
+
+  tilePos() {
+    return {
+      x: Math.floor(this.sprite.position.x),
+      y: Math.floor(this.sprite.position.z),
+    };
+  }
+
+  update(dt, playerTile) {
+    if (this.dead) return;
+    this.repathMs -= dt * 1000;
+    if (this.repathMs <= 0 || !this.target) {
+      this.repathMs = REPATH_MS;
+      const mt = this.tilePos();
+      const step = bfsNextStep(this.grid, mt.x, mt.y, playerTile.x, playerTile.y);
+      this.target = step ? { x: step.x + 0.5, z: step.y + 0.5 } : null;
+    }
+    if (this.target) {
+      const p = this.sprite.position;
+      const dx = this.target.x - p.x, dz = this.target.z - p.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.05) {
+        this.target = null;
+      } else {
+        const step = Math.min(d, this.speed * dt);
+        p.x += (dx / d) * step;
+        p.z += (dz / d) * step;
+      }
+    }
+  }
+
+  takeDamage(n) {
+    this.hp -= n;
+    // короткая вспышка-тинт при попадании
+    this.sprite.material.color.setHex(0xff8080);
+    setTimeout(() => { if (!this.dead) this.sprite.material.color.setHex(0xffffff); }, 90);
+    if (this.hp <= 0) { this.kill(); return true; }
+    return false;
+  }
+
+  kill() {
+    if (this.dead) return;
+    this.dead = true;
+    this.sprite.removeFromParent();
+    this.sprite.material.dispose();
+  }
+}
+
+// Зоопарк текстур + базовые скорости (units/sec; игрок ~4.2).
+export const MONSTER_KINDS = [
+  { texture: 'assets/0x72/chort_idle_anim_f0.png',       speed: 4.2, hp: 1, scale: 0.7 },
+  { texture: 'assets/0x72/imp_idle_anim_f0.png',         speed: 3.6, hp: 1, scale: 0.6 },
+  { texture: 'assets/0x72/goblin_idle_anim_f0.png',      speed: 4.6, hp: 1, scale: 0.6 },
+  { texture: 'assets/0x72/skelet_idle_anim_f0.png',      speed: 2.8, hp: 2, scale: 0.7 },
+  { texture: 'assets/0x72/big_zombie_idle_anim_f0.png',  speed: 2.4, hp: 4, scale: 1.0 },
+  { texture: 'assets/0x72/orc_warrior_idle_anim_f0.png', speed: 3.2, hp: 2, scale: 0.8 },
+  { texture: 'assets/0x72/masked_orc_idle_anim_f0.png',  speed: 3.6, hp: 1, scale: 0.7 },
+  { texture: 'assets/0x72/tiny_zombie_idle_anim_f0.png', speed: 3.8, hp: 1, scale: 0.5 },
+];
