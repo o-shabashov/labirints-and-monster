@@ -41,6 +41,29 @@
       background: radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(255,0,0,0.55) 100%);
       opacity: 0; transition: opacity 0.12s ease-out;
     }
+    /* viewmodel — посох, привязан снизу-справа, бобает через --bob */
+    #viewmodel {
+      position: fixed; right: 16%; bottom: -2%; z-index: 5; display: none;
+      pointer-events: none; transform: translateY(var(--bob, 0px)) translateY(var(--recoil, 0px));
+    }
+    #staff {
+      width: 26px; height: 340px; border-radius: 13px;
+      background: linear-gradient(90deg, #5a3a22, #7a5230 45%, #3a2616);
+      transform: rotate(18deg); transform-origin: bottom center;
+      box-shadow: -6px 0 12px rgba(0,0,0,0.5);
+      position: relative;
+    }
+    #stafftip {
+      position: absolute; top: -26px; left: 50%; width: 46px; height: 46px;
+      transform: translateX(-50%);
+      border-radius: 50%;
+      background: radial-gradient(circle, #fff2c0 0%, #ffaa33 45%, rgba(255,120,0,0) 75%);
+      animation: tipPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes tipPulse {
+      0%,100% { opacity: 0.75; transform: translateX(-50%) scale(0.9); }
+      50%     { opacity: 1;    transform: translateX(-50%) scale(1.15); }
+    }
   </style>
   <script type="importmap">
   {
@@ -59,12 +82,16 @@
     <div id="weap">🚀 <span id="rocketState">готова</span> · 💣 <span id="bombCount">5</span></div>
   </div>
   <div id="flash"></div>
+  <!-- viewmodel: посох мага снизу-справа (игрок — wizard) -->
+  <div id="viewmodel">
+    <div id="staff"><div id="stafftip"></div></div>
+  </div>
   <div id="overlay">
     <h1>LABIRINTS 3D</h1>
     <p>WASD — движение · Мышь — обзор · Shift — спринт</p>
     <p>ЛКМ — стрельба · Esc — освободить курсор</p>
     <p class="go">Кликни, чтобы войти</p>
   </div>
-  <script type="module" src="./src/three/main3d.js?v=3d4"></script>
+  <script type="module" src="./src/three/main3d.js?v=3d5"></script>
 </body>
 </html>

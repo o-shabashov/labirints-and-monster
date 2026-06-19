@@ -6,6 +6,7 @@ import { buildWorld } from './World3D.js';
 import { FpsControls } from './FpsControls.js';
 import { Monster3D, MONSTER_KINDS } from './Monster3D.js';
 import { Rocket3D, Bomb3D, spawnExplosion } from './Weapons3D.js';
+import { Sound3D } from './Sound3D.js';
 
 const EYE_H = 0.55;
 const MONSTER_BASE = 14;
@@ -29,6 +30,7 @@ const lvlEl = document.getElementById('lvl');
 const flashEl = document.getElementById('flash');
 const rocketStateEl = document.getElementById('rocketState');
 const bombCountEl = document.getElementById('bombCount');
+const viewmodelEl = document.getElementById('viewmodel');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -68,6 +70,11 @@ let explosions = [];
 let nextRocketAt = 0;
 let hurtUntil = 0;
 let shakeT = 0;
+// viewmodel / footstep
+let vmRecoil = 0;
+let walkPhase = 0;
+let stepDist = 0;
+const prevPos = new THREE.Vector3();
 
 function clearLevel() {
   for (const m of monsters) m.kill();
@@ -134,6 +141,7 @@ function damagePlayer(now) {
   hurtUntil = now + TOUCH_IFRAMES_MS;
   hp -= 1;
   updateHud();
+  Sound3D.hurt();
   flashEl.style.opacity = '1';
   setTimeout(() => { flashEl.style.opacity = '0'; }, 120);
   if (hp <= 0) {
@@ -160,6 +168,8 @@ function fireRocket(now) {
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
   rockets.push(new Rocket3D(scene, camera.position.clone().addScaledVector(dir, 0.4), dir));
+  Sound3D.rocket();
+  vmRecoil = 42;
 }
 function throwBomb() {
   if (bombAmmo <= 0) return;
@@ -172,6 +182,7 @@ function explode(pos, opts = {}) {
   const radius = opts.radius ?? ROCKET_RADIUS;
   const dmg = opts.dmg ?? 3;
   explosions.push(spawnExplosion(scene, pos, { radius, count: opts.count ?? 22 }));
+  Sound3D.explosion();
   shakeT = Math.max(shakeT, opts.shake ?? 0.18);
   const r2 = radius * radius;
   for (const m of monsters) {
@@ -190,6 +201,8 @@ let nextShotAt = 0;
 function shoot(now) {
   if (now < nextShotAt) return;
   nextShotAt = now + 250;
+  Sound3D.shoot();
+  vmRecoil = 24;
   crosshair.style.transform = 'translate(-50%,-50%) scale(1.5)';
   setTimeout(() => { crosshair.style.transform = 'translate(-50%,-50%)'; }, 60);
   raycaster.setFromCamera(SCREEN_CENTER, camera);
@@ -208,11 +221,15 @@ controls.addEventListener('lock', () => {
   overlay.style.display = 'none';
   crosshair.style.display = 'block';
   hud.style.display = 'block';
+  viewmodelEl.style.display = 'block';
+  prevPos.copy(camera.position);
+  Sound3D.resume();
 });
 controls.addEventListener('unlock', () => {
   overlay.style.display = 'flex';
   crosshair.style.display = 'none';
   hud.style.display = 'none';
+  viewmodelEl.style.display = 'none';
 });
 window.addEventListener('mousedown', (e) => {
   if (!controls.isLocked) return;
@@ -245,6 +262,16 @@ function animate() {
   const now = performance.now();
   if (controls.isLocked && !dead && !won) fps.update(dt);
   torch.position.copy(camera.position);
+
+  // движение игрока за кадр → шаги + bob viewmodel
+  const moved = Math.hypot(camera.position.x - prevPos.x, camera.position.z - prevPos.z);
+  prevPos.copy(camera.position);
+  const walking = controls.isLocked && moved > 0.0005;
+  if (walking) {
+    walkPhase += moved * 9;
+    stepDist += moved;
+    if (stepDist > 0.9) { Sound3D.step(); stepDist = 0; }
+  }
 
   const playerTile = { x: Math.floor(camera.position.x), y: Math.floor(camera.position.z) };
 
@@ -295,6 +322,12 @@ function animate() {
 
   rocketStateEl.textContent = now >= nextRocketAt ? 'готова' : `${((nextRocketAt - now) / 1000).toFixed(1)}с`;
   bombCountEl.textContent = bombAmmo;
+
+  // viewmodel: bob при ходьбе + затухающий recoil; факел мерцает
+  vmRecoil += (0 - vmRecoil) * Math.min(1, dt * 12);
+  const bob = walking ? Math.sin(walkPhase) * 7 : 0;
+  viewmodelEl.style.transform = `translateY(${bob + vmRecoil}px)`;
+  torch.intensity = 1.8 + Math.sin(now * 0.012) * 0.18 + (Math.random() - 0.5) * 0.12;
 
   renderer.render(scene, camera);
   if (shakeT > 0) { camera.position.x -= sx; camera.position.y -= sy; camera.position.z -= sz; }

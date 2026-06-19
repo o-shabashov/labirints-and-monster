@@ -37,11 +37,14 @@ export class Monster3D {
     this.sprite = new THREE.Sprite(mat);
     const s = opts.scale ?? 0.7;
     this.sprite.scale.set(s, s * 1.3, 1);   // выше чем шире — человекоформа
-    this.sprite.position.set(opts.tx + 0.5, s * 0.65, opts.ty + 0.5);
+    this.baseY = s * 0.65;
+    this.sprite.position.set(opts.tx + 0.5, this.baseY, opts.ty + 0.5);
     scene.add(this.sprite);
 
     this.target = null;
     this.repathMs = 0;
+    // процедурный bob (кадров анимации в 0x72 нет — оживляем покачиванием)
+    this.bobT = Math.random() * Math.PI * 2;
   }
 
   tilePos() {
@@ -60,6 +63,7 @@ export class Monster3D {
       const step = bfsNextStep(this.grid, mt.x, mt.y, playerTile.x, playerTile.y);
       this.target = step ? { x: step.x + 0.5, z: step.y + 0.5 } : null;
     }
+    let moving = false;
     if (this.target) {
       const p = this.sprite.position;
       const dx = this.target.x - p.x, dz = this.target.z - p.z;
@@ -70,8 +74,12 @@ export class Monster3D {
         const step = Math.min(d, this.speed * dt);
         p.x += (dx / d) * step;
         p.z += (dz / d) * step;
+        moving = true;
       }
     }
+    // bob — покачивание вверх-вниз, быстрее при движении
+    this.bobT += dt * (moving ? 9 : 3);
+    this.sprite.position.y = this.baseY + Math.sin(this.bobT) * 0.05;
   }
 
   takeDamage(n) {
