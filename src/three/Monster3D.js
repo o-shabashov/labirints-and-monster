@@ -41,6 +41,16 @@ export class Monster3D {
     this.sprite.position.set(opts.tx + 0.5, this.baseY, opts.ty + 0.5);
     scene.add(this.sprite);
 
+    // Тень-блоб на полу под монстром — даёт объём/привязку к земле
+    // (billboard сам по себе «плавает»).
+    this.shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(s * 0.42, 14),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.38, depthWrite: false }),
+    );
+    this.shadow.rotation.x = -Math.PI / 2;
+    this.shadow.position.set(opts.tx + 0.5, 0.02, opts.ty + 0.5);
+    scene.add(this.shadow);
+
     this.target = null;
     this.repathMs = 0;
     this.speedMul = 1;   // множитель скорости от difficulty engine
@@ -81,6 +91,9 @@ export class Monster3D {
     // bob — покачивание вверх-вниз, быстрее при движении
     this.bobT += dt * (moving ? 9 : 3);
     this.sprite.position.y = this.baseY + Math.sin(this.bobT) * 0.05;
+    // тень следует за позицией (на полу, фикс. высота)
+    this.shadow.position.x = this.sprite.position.x;
+    this.shadow.position.z = this.sprite.position.z;
   }
 
   takeDamage(n) {
@@ -97,6 +110,11 @@ export class Monster3D {
     this.dead = true;
     this.sprite.removeFromParent();
     this.sprite.material.dispose();
+    if (this.shadow) {
+      this.shadow.removeFromParent();
+      this.shadow.geometry.dispose();
+      this.shadow.material.dispose();
+    }
   }
 }
 

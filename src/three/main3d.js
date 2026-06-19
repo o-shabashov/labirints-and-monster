@@ -34,6 +34,11 @@ const rocketStateEl = document.getElementById('rocketState');
 const bombCountEl = document.getElementById('bombCount');
 const diffEl = document.getElementById('diff');
 const viewmodelEl = document.getElementById('viewmodel');
+const compassEl = document.getElementById('compass');
+const compassArrowEl = document.getElementById('compassArrow');
+const compassDistEl = document.getElementById('compassDist');
+const introhintEl = document.getElementById('introhint');
+let introShown = false;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -289,14 +294,24 @@ controls.addEventListener('lock', () => {
   crosshair.style.display = 'block';
   hud.style.display = 'block';
   viewmodelEl.style.display = 'block';
+  compassEl.style.display = 'block';
   prevPos.copy(camera.position);
   Sound3D.resume();
+  // вводная подсказка — один раз, плавно гаснет
+  if (!introShown) {
+    introShown = true;
+    introhintEl.style.display = 'block';
+    introhintEl.style.opacity = '1';
+    setTimeout(() => { introhintEl.style.opacity = '0'; }, 6000);
+    setTimeout(() => { introhintEl.style.display = 'none'; }, 7200);
+  }
 });
 controls.addEventListener('unlock', () => {
   overlay.style.display = 'flex';
   crosshair.style.display = 'none';
   hud.style.display = 'none';
   viewmodelEl.style.display = 'none';
+  compassEl.style.display = 'none';
 });
 window.addEventListener('mousedown', (e) => {
   if (!controls.isLocked) return;
@@ -421,6 +436,21 @@ function animate() {
     : (now >= nextRocketAt ? 'готова' : `${((nextRocketAt - now) / 1000).toFixed(1)}с`);
   bombCountEl.textContent = bombAmmo;
   diffEl.textContent = `Сложность ×${diffMul.toFixed(2)}`;
+
+  // компас к выходу: стрелка крутится относительно взгляда
+  if (exitTile) {
+    const fdir = new THREE.Vector3();
+    camera.getWorldDirection(fdir);
+    const heading = Math.atan2(fdir.x, fdir.z);
+    const ex = exitTile.x + 0.5 - camera.position.x;
+    const ez = exitTile.y + 0.5 - camera.position.z;
+    let rel = Math.atan2(ex, ez) - heading;
+    while (rel > Math.PI) rel -= Math.PI * 2;
+    while (rel < -Math.PI) rel += Math.PI * 2;
+    // знак инвертирован: CSS rotate по часовой, exit справа → стрелка вправо
+    compassArrowEl.style.transform = `rotate(${-rel}rad)`;
+    compassDistEl.textContent = `${Math.round(Math.hypot(ex, ez))} м`;
+  }
 
   // viewmodel: bob при ходьбе + затухающий recoil; факел мерцает
   vmRecoil += (0 - vmRecoil) * Math.min(1, dt * 12);

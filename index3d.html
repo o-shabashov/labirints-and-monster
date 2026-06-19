@@ -65,6 +65,24 @@
       0%,100% { opacity: 0.75; transform: translateX(-50%) scale(0.9); }
       50%     { opacity: 1;    transform: translateX(-50%) scale(1.15); }
     }
+    /* компас — указывает на выход относительно взгляда */
+    #compass {
+      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+      z-index: 5; display: none; text-align: center;
+      font-family: monospace; color: #ffd54f; opacity: 0.7;
+      pointer-events: none; text-shadow: 0 0 4px #000;
+    }
+    #compassArrow { display: inline-block; font-size: 26px; transition: transform 0.08s linear; }
+    #compassDist { display: block; font-size: 12px; color: #cdd6e0; margin-top: -2px; }
+    /* вводная подсказка — плавно гаснет */
+    #introhint {
+      position: fixed; bottom: 16%; left: 50%; transform: translateX(-50%);
+      z-index: 5; display: none; max-width: 60%; text-align: center;
+      font-family: monospace; font-size: 16px; color: #e8eef6;
+      background: rgba(8,10,14,0.6); padding: 10px 18px; border-radius: 8px;
+      text-shadow: 0 0 3px #000; transition: opacity 1s ease-out;
+    }
+    #introhint b { color: #ffd54f; }
   </style>
   <script type="importmap">
   {
@@ -78,6 +96,9 @@
 <body>
   <canvas id="c"></canvas>
   <div id="crosshair"></div>
+  <!-- компас к выходу + вводная подсказка -->
+  <div id="compass"><span id="compassArrow">⬆</span><span id="compassDist"></span></div>
+  <div id="introhint">Найди светящийся <b>жёлтый выход</b> · ЛКМ — стрелять · подбери <b>ракетницу</b> и <b>бомбы</b></div>
   <div id="hud">
     HP: <span id="hp">♥♥♥</span><span id="killcnt"></span><span id="lvl"></span>
     <div id="weap">🚀 <span id="rocketState">нет</span> · 💣 <span id="bombCount">0</span> · <span id="diff">Сложность ×1.0</span></div>
@@ -93,6 +114,6 @@
     <p>ЛКМ — стрельба · Esc — освободить курсор</p>
     <p class="go">Кликни, чтобы войти</p>
   </div>
-  <script type="module" src="./src/three/main3d.js?v=3d8"></script>
+  <script type="module" src="./src/three/main3d.js?v=3d9"></script>
 </body>
 </html>
