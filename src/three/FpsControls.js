@@ -25,6 +25,13 @@ export class FpsControls {
     window.addEventListener('keyup',   (e) => this.keys.delete(e.code));
   }
 
+  // при смене уровня — новый grid (collision читает его каждый кадр)
+  setGrid(grid) {
+    this.grid = grid;
+    this.h = grid.length;
+    this.w = grid[0].length;
+  }
+
   update(dt) {
     const k = this.keys;
     let mf = 0, mr = 0;

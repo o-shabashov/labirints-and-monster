@@ -32,6 +32,7 @@
       text-shadow: 0 0 4px #000; pointer-events: none;
     }
     #killcnt { color: #cdd6e0; font-size: 15px; margin-left: 16px; }
+    #lvl { color: #ffd54f; font-size: 15px; margin-left: 16px; }
     #weap { font-size: 15px; color: #ffd54f; margin-top: 6px; }
     #weap #bombCount { color: #cdd6e0; }
     /* красная вспышка при получении урона */
@@ -54,7 +55,7 @@
   <canvas id="c"></canvas>
   <div id="crosshair"></div>
   <div id="hud">
-    HP: <span id="hp">♥♥♥</span><span id="killcnt"></span>
+    HP: <span id="hp">♥♥♥</span><span id="killcnt"></span><span id="lvl"></span>
     <div id="weap">🚀 <span id="rocketState">готова</span> · 💣 <span id="bombCount">5</span></div>
   </div>
   <div id="flash"></div>
@@ -64,6 +65,6 @@
     <p>ЛКМ — стрельба · Esc — освободить курсор</p>
     <p class="go">Кликни, чтобы войти</p>
   </div>
-  <script type="module" src="./src/three/main3d.js?v=3d3"></script>
+  <script type="module" src="./src/three/main3d.js?v=3d4"></script>
 </body>
 </html>

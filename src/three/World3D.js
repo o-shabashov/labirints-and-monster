@@ -25,6 +25,10 @@ function loadPixelTexture(path, repeatX = 1, repeatY = 1) {
 
 export function buildWorld(scene, grid) {
   const h = grid.length, w = grid[0].length;
+  // Все объекты уровня — в одну Group, чтобы при смене уровня снести разом
+  // (scene.remove(group)).
+  const group = new THREE.Group();
+  scene.add(group);
 
   // ---- Пол ----
   const floorTex = loadPixelTexture('assets/0x72/floor_1.png', w, h);
@@ -34,7 +38,7 @@ export function buildWorld(scene, grid) {
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(w / 2, 0, h / 2);
-  scene.add(floor);
+  group.add(floor);
 
   // ---- Потолок ----
   const ceilTex = loadPixelTexture('assets/0x72/wall_mid.png', w, h);
@@ -44,7 +48,7 @@ export function buildWorld(scene, grid) {
   );
   ceil.rotation.x = Math.PI / 2;
   ceil.position.set(w / 2, WALL_H, h / 2);
-  scene.add(ceil);
+  group.add(ceil);
 
   // ---- Стены (InstancedMesh) ----
   const wallTex = loadPixelTexture('assets/0x72/wall_mid.png');
@@ -84,8 +88,8 @@ export function buildWorld(scene, grid) {
   }
   wallMesh.instanceMatrix.needsUpdate = true;
   solidMesh.instanceMatrix.needsUpdate = true;
-  scene.add(wallMesh);
-  scene.add(solidMesh);
+  group.add(wallMesh);
+  group.add(solidMesh);
 
   // Разрушение: прячем instance (zero-scale матрица) и переводим тайл в
   // FLOOR. grid — общий ref, поэтому коллизия игрока и BFS монстров
@@ -127,11 +131,11 @@ export function buildWorld(scene, grid) {
       new THREE.MeshBasicMaterial({ color: 0xffd54f }),
     );
     pillar.position.set(exit.x + 0.5, WALL_H / 2, exit.y + 0.5);
-    scene.add(pillar);
+    group.add(pillar);
     const exitLight = new THREE.PointLight(0xffd54f, 1.4, 5);
     exitLight.position.set(exit.x + 0.5, WALL_H * 0.7, exit.y + 0.5);
-    scene.add(exitLight);
+    group.add(exitLight);
   }
 
-  return { floor, wallMesh, solidMesh, exit, damageWall };
+  return { group, wallMesh, solidMesh, exit, damageWall };
 }
