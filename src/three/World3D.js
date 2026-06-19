@@ -65,20 +65,54 @@ export function buildWorld(scene, grid) {
   const wallMesh = new THREE.InstancedMesh(box, wallMat, Math.max(1, wallCount));
   const solidMesh = new THREE.InstancedMesh(box, solidMat, Math.max(1, solidCount));
   const m = new THREE.Matrix4();
+  // tileKey (ty*w+tx) → {mesh, index} для разрушаемых WALL — чтобы прятать
+  // конкретный instance при damageWall.
+  const instanceByTile = new Map();
   let wi = 0, si = 0;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const t = grid[y][x];
       if (!isBlockingTile(t)) continue;
       m.makeTranslation(x + 0.5, WALL_H / 2, y + 0.5);
-      if (t === TILE.SOLID_WALL) solidMesh.setMatrixAt(si++, m);
-      else wallMesh.setMatrixAt(wi++, m);
+      if (t === TILE.SOLID_WALL) {
+        solidMesh.setMatrixAt(si++, m);
+      } else {
+        instanceByTile.set(y * w + x, wi);
+        wallMesh.setMatrixAt(wi++, m);
+      }
     }
   }
   wallMesh.instanceMatrix.needsUpdate = true;
   solidMesh.instanceMatrix.needsUpdate = true;
   scene.add(wallMesh);
   scene.add(solidMesh);
+
+  // Разрушение: прячем instance (zero-scale матрица) и переводим тайл в
+  // FLOOR. grid — общий ref, поэтому коллизия игрока и BFS монстров
+  // автоматически видят новый проход. SOLID_WALL не рушится.
+  const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  function damageWall(worldX, worldZ, radius) {
+    const r = Math.ceil(radius);
+    const cx = Math.floor(worldX), cz = Math.floor(worldZ);
+    let changed = false;
+    for (let ty = cz - r; ty <= cz + r; ty++) {
+      for (let tx = cx - r; tx <= cx + r; tx++) {
+        if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+        if (grid[ty][tx] !== TILE.WALL) continue;   // только разрушаемые
+        // центр тайла в радиусе взрыва?
+        const dx = tx + 0.5 - worldX, dz = ty + 0.5 - worldZ;
+        if (dx * dx + dz * dz > radius * radius) continue;
+        const idx = instanceByTile.get(ty * w + tx);
+        if (idx === undefined) continue;
+        wallMesh.setMatrixAt(idx, _zero);
+        instanceByTile.delete(ty * w + tx);
+        grid[ty][tx] = TILE.FLOOR;
+        changed = true;
+      }
+    }
+    if (changed) wallMesh.instanceMatrix.needsUpdate = true;
+    return changed;
+  }
 
   // ---- Маркер выхода — светящийся жёлтый столб ----
   let exit = null;
@@ -99,5 +133,5 @@ export function buildWorld(scene, grid) {
     scene.add(exitLight);
   }
 
-  return { floor, wallMesh, solidMesh, exit };
+  return { floor, wallMesh, solidMesh, exit, damageWall };
 }
