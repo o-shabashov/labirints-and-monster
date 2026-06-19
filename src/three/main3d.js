@@ -37,12 +37,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x05060a);
-scene.fog = new THREE.Fog(0x05060a, 2.5, 11);
+scene.background = new THREE.Color(0x0a0c12);
+scene.fog = new THREE.Fog(0x0a0c12, 3.5, 15);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 100);
-scene.add(new THREE.AmbientLight(0x556070, 0.7));
-const torch = new THREE.PointLight(0xffc080, 1.8, 10, 1.3);
+scene.add(new THREE.AmbientLight(0x6c7890, 0.95));
+const torch = new THREE.PointLight(0xffc080, 2.2, 13, 1.2);
 scene.add(torch);
 
 const controls = new PointerLockControls(camera, document.body);
@@ -66,6 +66,7 @@ let transitioning = false;
 // снаряды/эффекты
 let rockets = [];
 let bombs = [];
+let tracers = [];          // видимые трассеры пуль (cosmetic, урон hitscan)
 let explosions = [];
 let nextRocketAt = 0;
 let hurtUntil = 0;
@@ -194,9 +195,11 @@ function explode(pos, opts = {}) {
   if (world && world.damageWall) world.damageWall(pos.x, pos.z, radius);
 }
 
-// ---- Стрельба (hitscan) ----
+// ---- Стрельба (hitscan + видимый трассер) ----
 const raycaster = new THREE.Raycaster();
 const SCREEN_CENTER = new THREE.Vector2(0, 0);
+const TRACER_GEO = new THREE.SphereGeometry(0.05, 6, 6);
+const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xfff176 });
 let nextShotAt = 0;
 function shoot(now) {
   if (now < nextShotAt) return;
@@ -205,11 +208,25 @@ function shoot(now) {
   vmRecoil = 24;
   crosshair.style.transform = 'translate(-50%,-50%) scale(1.5)';
   setTimeout(() => { crosshair.style.transform = 'translate(-50%,-50%)'; }, 60);
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
   raycaster.setFromCamera(SCREEN_CENTER, camera);
   const hits = raycaster.intersectObjects(monsters.filter(m => !m.dead).map(m => m.sprite), false);
-  if (!hits.length) return;
-  const m = monsters.find(mm => mm.sprite === hits[0].object);
-  if (m && m.takeDamage(1)) { kills++; updateHud(); }
+  // muzzle чуть ниже-правее центра — будто из посоха
+  const muzzle = camera.position.clone().addScaledVector(dir, 0.35);
+  muzzle.y -= 0.06;
+  let endpoint;
+  if (hits.length) {
+    endpoint = hits[0].point.clone();
+    const m = monsters.find(mm => mm.sprite === hits[0].object);
+    if (m && m.takeDamage(1)) { kills++; updateHud(); }
+  } else {
+    endpoint = muzzle.clone().addScaledVector(dir, 14);
+  }
+  const mesh = new THREE.Mesh(TRACER_GEO, TRACER_MAT);
+  mesh.position.copy(muzzle);
+  scene.add(mesh);
+  tracers.push({ mesh, from: muzzle.clone(), to: endpoint, t: 0, dur: 0.09 });
 }
 
 // ---- Ввод ----
@@ -311,6 +328,15 @@ function animate() {
 
   explosions = explosions.filter(tick => !tick(dt));
 
+  // трассеры пуль — летят muzzle→endpoint, исчезают
+  for (const tr of tracers) {
+    tr.t += dt;
+    const k = Math.min(1, tr.t / tr.dur);
+    tr.mesh.position.lerpVectors(tr.from, tr.to, k);
+    if (k >= 1) { tr.mesh.removeFromParent(); tr.done = true; }
+  }
+  tracers = tracers.filter(tr => !tr.done);
+
   // тряска камеры
   let sx = 0, sy = 0, sz = 0;
   if (shakeT > 0) {
@@ -327,7 +353,7 @@ function animate() {
   vmRecoil += (0 - vmRecoil) * Math.min(1, dt * 12);
   const bob = walking ? Math.sin(walkPhase) * 7 : 0;
   viewmodelEl.style.transform = `translateY(${bob + vmRecoil}px)`;
-  torch.intensity = 1.8 + Math.sin(now * 0.012) * 0.18 + (Math.random() - 0.5) * 0.12;
+  torch.intensity = 2.2 + Math.sin(now * 0.012) * 0.2 + (Math.random() - 0.5) * 0.12;
 
   renderer.render(scene, camera);
   if (shakeT > 0) { camera.position.x -= sx; camera.position.y -= sy; camera.position.z -= sz; }
