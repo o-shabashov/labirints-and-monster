@@ -30,9 +30,15 @@ const hpEl = document.getElementById('hp');
 const killEl = document.getElementById('killcnt');
 const lvlEl = document.getElementById('lvl');
 const flashEl = document.getElementById('flash');
-const rocketStateEl = document.getElementById('rocketState');
-const bombCountEl = document.getElementById('bombCount');
 const diffEl = document.getElementById('diff');
+const hbRocketEl = document.getElementById('hbRocket');
+const hbBombEl = document.getElementById('hbBomb');
+const slotEls = {
+  gun:    document.querySelector('.slot[data-w="gun"]'),
+  rocket: document.querySelector('.slot[data-w="rocket"]'),
+  bomb:   document.querySelector('.slot[data-w="bomb"]'),
+};
+let currentWeapon = 'gun';
 const viewmodelEl = document.getElementById('viewmodel');
 const compassEl = document.getElementById('compass');
 const compassArrowEl = document.getElementById('compassArrow');
@@ -135,6 +141,12 @@ function loadLevel(lvl) {
     for (let x = 0; x < GRID_W; x++)
       if (grid[y][x] === TILE.ENTRANCE) spawn = { x: x + 0.5, y: y + 0.5 };
   camera.position.set(spawn.x, EYE_H, spawn.y);
+  // смотреть в открытый проход, а не в стену
+  const etx = Math.floor(spawn.x), ety = Math.floor(spawn.y);
+  const open = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) =>
+    grid[ety + dz] && grid[ety + dz][etx + dx] === TILE.FLOOR);
+  const od = open || [1, 0];
+  camera.lookAt(spawn.x + od[0], EYE_H, spawn.y + od[1]);
 
   if (!fps) fps = new FpsControls(camera, grid);
   else fps.setGrid(grid);
@@ -284,6 +296,25 @@ function shoot(now) {
   tracers.push({ mesh, from: muzzle.clone(), to: endpoint, t: 0, dur: 0.09 });
 }
 
+// ---- Выбор оружия ----
+function selectWeapon(w) {
+  if (w === 'rocket' && !hasRocket) return;   // ракетница ещё не подобрана
+  currentWeapon = w;
+  refreshHotbar();
+}
+function fireCurrent(now) {
+  if (currentWeapon === 'gun') shoot(now);
+  else if (currentWeapon === 'rocket') fireRocket(now);
+  else if (currentWeapon === 'bomb') { throwBomb(); if (bombAmmo <= 0) selectWeapon('gun'); }
+}
+function refreshHotbar() {
+  slotEls.gun.classList.toggle('active', currentWeapon === 'gun');
+  slotEls.rocket.classList.toggle('active', currentWeapon === 'rocket');
+  slotEls.bomb.classList.toggle('active', currentWeapon === 'bomb');
+  slotEls.rocket.classList.toggle('locked', !hasRocket);
+  slotEls.bomb.classList.toggle('locked', bombAmmo <= 0);
+}
+
 // ---- Ввод ----
 overlay.addEventListener('click', () => {
   if (dead || won) { location.reload(); return; }
@@ -315,14 +346,17 @@ controls.addEventListener('unlock', () => {
 });
 window.addEventListener('mousedown', (e) => {
   if (!controls.isLocked) return;
-  if (e.button === 0) shoot(performance.now());
-  else if (e.button === 2) fireRocket(performance.now());
+  if (e.button === 0) fireCurrent(performance.now());        // ЛКМ — текущее оружие
+  else if (e.button === 2) { selectWeapon('rocket'); fireRocket(performance.now()); } // ПКМ — ракета
 });
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('keydown', (e) => {
   if (!controls.isLocked) return;
-  if (e.code === 'KeyQ') fireRocket(performance.now());
-  else if (e.code === 'KeyF') throwBomb();
+  if (e.code === 'Digit1') selectWeapon('gun');
+  else if (e.code === 'Digit2') selectWeapon('rocket');
+  else if (e.code === 'Digit3') selectWeapon('bomb');
+  else if (e.code === 'KeyQ') { selectWeapon('rocket'); fireRocket(performance.now()); }
+  else if (e.code === 'KeyF') { selectWeapon('bomb'); throwBomb(); if (bombAmmo <= 0) selectWeapon('gun'); }
 });
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -332,7 +366,7 @@ window.addEventListener('resize', () => {
 
 // дев-доступ
 window.__three = { scene, camera, renderer, get grid() { return grid; }, get world() { return world; }, get pickups() { return pickups; } };
-window.__three_dbg = { fireRocket, throwBomb, explode, reachExit, loadLevel, get hasRocket() { return hasRocket; }, get bombAmmo() { return bombAmmo; } };
+window.__three_dbg = { fireRocket, throwBomb, explode, reachExit, loadLevel, selectWeapon, get hasRocket() { return hasRocket; }, get bombAmmo() { return bombAmmo; }, get currentWeapon() { return currentWeapon; } };
 
 // ---- Запуск ----
 loadLevel(1);
@@ -385,8 +419,8 @@ function animate() {
     const dx = p.mesh.position.x - camera.position.x;
     const dz = p.mesh.position.z - camera.position.z;
     if (dx * dx + dz * dz < PICKUP_DIST * PICKUP_DIST) {
-      if (p.type === 'rocket') { hasRocket = true; nextRocketAt = 0; }
-      else { bombAmmo += BOMBS_PER_PICKUP; }
+      if (p.type === 'rocket') { hasRocket = true; nextRocketAt = 0; selectWeapon('rocket'); }
+      else { bombAmmo += BOMBS_PER_PICKUP; selectWeapon('bomb'); }
       Sound3D.step();
       p.mesh.removeFromParent();
       p.taken = true;
@@ -432,9 +466,10 @@ function animate() {
     camera.position.x += sx; camera.position.y += sy; camera.position.z += sz;
   }
 
-  rocketStateEl.textContent = !hasRocket ? 'нет'
-    : (now >= nextRocketAt ? 'готова' : `${((nextRocketAt - now) / 1000).toFixed(1)}с`);
-  bombCountEl.textContent = bombAmmo;
+  refreshHotbar();
+  hbRocketEl.textContent = hasRocket
+    ? (now >= nextRocketAt ? '' : ` ${((nextRocketAt - now) / 1000).toFixed(1)}с`) : '';
+  hbBombEl.textContent = bombAmmo > 0 ? ` ×${bombAmmo}` : '';
   diffEl.textContent = `Сложность ×${diffMul.toFixed(2)}`;
 
   // компас к выходу: стрелка крутится относительно взгляда

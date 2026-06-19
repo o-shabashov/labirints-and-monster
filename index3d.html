@@ -33,9 +33,16 @@
     }
     #killcnt { color: #cdd6e0; font-size: 15px; margin-left: 16px; }
     #lvl { color: #ffd54f; font-size: 15px; margin-left: 16px; }
-    #weap { font-size: 15px; color: #ffd54f; margin-top: 6px; }
-    #weap #bombCount { color: #cdd6e0; }
-    #weap #diff { color: #aaaaaa; }
+    #hotbar { margin-top: 8px; font-size: 14px; }
+    #hotbar .slot {
+      display: inline-block; margin-right: 6px; padding: 3px 9px;
+      border: 1px solid #3a4250; border-radius: 5px;
+      background: rgba(20,24,30,0.6); color: #cdd6e0;
+    }
+    #hotbar .slot b { color: #ffd54f; margin-right: 3px; }
+    #hotbar .slot.active { border-color: #ffd54f; background: rgba(80,64,20,0.55); color: #fff; }
+    #hotbar .slot.locked { opacity: 0.4; }
+    #hotbar #diff { color: #aaaaaa; margin-left: 10px; }
     /* красная вспышка при получении урона */
     #flash {
       position: fixed; inset: 0; z-index: 4; pointer-events: none;
@@ -101,7 +108,12 @@
   <div id="introhint">Найди светящийся <b>жёлтый выход</b> · ЛКМ — стрелять · подбери <b>ракетницу</b> и <b>бомбы</b></div>
   <div id="hud">
     HP: <span id="hp">♥♥♥</span><span id="killcnt"></span><span id="lvl"></span>
-    <div id="weap">🚀 <span id="rocketState">нет</span> · 💣 <span id="bombCount">0</span> · <span id="diff">Сложность ×1.0</span></div>
+    <div id="hotbar">
+      <span class="slot active" data-w="gun"><b>1</b> Пушка</span>
+      <span class="slot locked" data-w="rocket"><b>2</b> 🚀 Ракета<span id="hbRocket"></span></span>
+      <span class="slot locked" data-w="bomb"><b>3</b> 💣 Бомба<span id="hbBomb"></span></span>
+      <span id="diff">Сложность ×1.0</span>
+    </div>
   </div>
   <div id="flash"></div>
   <!-- viewmodel: посох мага снизу-справа (игрок — wizard) -->
@@ -114,6 +126,6 @@
     <p>ЛКМ — стрельба · Esc — освободить курсор</p>
     <p class="go">Кликни, чтобы войти</p>
   </div>
-  <script type="module" src="./src/three/main3d.js?v=3d9"></script>
+  <script type="module" src="./src/three/main3d.js?v=3d10"></script>
 </body>
 </html>
