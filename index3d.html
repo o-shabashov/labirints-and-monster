@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Labirints 3D</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+    #c { display: block; width: 100vw; height: 100vh; }
+    /* Оверлей старта — pointer lock требует user-gesture (click). */
+    #overlay {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(8,10,14,0.86); color: #cdd6e0;
+      font-family: monospace; text-align: center; cursor: pointer; z-index: 10;
+    }
+    #overlay h1 { color: #4ec9ff; font-size: 34px; margin: 0 0 12px; letter-spacing: 2px; }
+    #overlay p  { margin: 4px 0; font-size: 15px; color: #8a93a0; }
+    #overlay .go { margin-top: 22px; font-size: 18px; color: #ffd54f; }
+    #crosshair {
+      position: fixed; left: 50%; top: 50%; width: 18px; height: 18px;
+      transform: translate(-50%,-50%); pointer-events: none; z-index: 5; display: none;
+    }
+    #crosshair::before, #crosshair::after {
+      content: ''; position: absolute; background: rgba(255,255,255,0.7);
+    }
+    #crosshair::before { left: 8px; top: 0; width: 2px; height: 18px; }
+    #crosshair::after  { top: 8px; left: 0; height: 2px; width: 18px; }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="crosshair"></div>
+  <div id="overlay">
+    <h1>LABIRINTS 3D</h1>
+    <p>WASD — движение · Мышь — обзор · Shift — спринт</p>
+    <p>ЛКМ — стрельба · Esc — освободить курсор</p>
+    <p class="go">Кликни, чтобы войти</p>
+  </div>
+  <script type="module" src="./src/three/main3d.js?v=3d1"></script>
+</body>
+</html>
