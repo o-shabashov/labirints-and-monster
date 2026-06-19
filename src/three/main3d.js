@@ -7,6 +7,7 @@ import { FpsControls } from './FpsControls.js';
 import { Monster3D, MONSTER_KINDS } from './Monster3D.js';
 import { Rocket3D, Bomb3D, spawnExplosion } from './Weapons3D.js';
 import { Sound3D } from './Sound3D.js';
+import { Difficulty } from '../systems/Difficulty.js';
 
 const EYE_H = 0.55;
 const MONSTER_BASE = 14;
@@ -17,8 +18,9 @@ const TOUCH_IFRAMES_MS = 900;
 const ROCKET_CD_MS = 1200;
 const ROCKET_RADIUS = 1.6;
 const BOMB_RADIUS = 2.2;
-const START_BOMBS = 5;
 const EXIT_DIST = 0.6;          // дистанция до exit-столба для перехода
+const PICKUP_DIST = 0.6;
+const BOMBS_PER_PICKUP = 3;
 
 const canvas = document.getElementById('c');
 const overlay = document.getElementById('overlay');
@@ -30,6 +32,7 @@ const lvlEl = document.getElementById('lvl');
 const flashEl = document.getElementById('flash');
 const rocketStateEl = document.getElementById('rocketState');
 const bombCountEl = document.getElementById('bombCount');
+const diffEl = document.getElementById('diff');
 const viewmodelEl = document.getElementById('viewmodel');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -50,15 +53,18 @@ const controls = new PointerLockControls(camera, document.body);
 // ---- Постоянное состояние игрока (через уровни) ----
 let hp = 3;
 let kills = 0;
-let bombAmmo = START_BOMBS;
+let bombAmmo = 0;          // бомбы только из пикапов
+let hasRocket = false;     // ракетница только из пикапа
 let level = 1;
 let dead = false;
 let won = false;
+const difficulty = new Difficulty();   // адаптивная сложность, персистентна
 
 // ---- Уровень-специфичное (пересоздаётся в loadLevel) ----
 let grid = null;
 let world = null;
 let monsters = [];
+let pickups = [];          // {mesh, type, bobBase}
 let exitTile = null;
 let fps = null;
 let transitioning = false;
@@ -84,8 +90,30 @@ function clearLevel() {
   rockets = [];
   for (const b of bombs) b.kill();
   bombs = [];
+  for (const p of pickups) p.mesh.removeFromParent();
+  pickups = [];
   explosions = [];
   if (world) { scene.remove(world.group); world = null; }
+}
+
+// Пикап-объект на floor-тайле: парящий светящийся предмет.
+function spawnPickup(type, tx, ty) {
+  let mesh;
+  if (type === 'rocket') {
+    mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.12, 0.4, 10),
+      new THREE.MeshBasicMaterial({ color: 0xff7043 }),
+    );
+    mesh.rotation.z = Math.PI / 2;
+  } else { // bomb
+    mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.16, 12, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffd54f }),
+    );
+  }
+  mesh.position.set(tx + 0.5, 0.4, ty + 0.5);
+  scene.add(mesh);
+  pickups.push({ mesh, type, bobBase: 0.4 });
 }
 
 function loadLevel(lvl) {
@@ -113,13 +141,33 @@ function loadLevel(lvl) {
       if (grid[y][x] !== TILE.FLOOR) continue;
       if (Math.hypot(x + 0.5 - spawn.x, y + 0.5 - spawn.y) >= 7) floorTiles.push({ x, y });
     }
-  const count = MONSTER_BASE + (lvl - 1) * MONSTERS_PER_LEVEL;
+  // Difficulty влияет на число монстров; уровень — на их HP (tier).
+  const dm = difficulty.multiplier(performance.now());
+  const tierHp = 1 + (lvl - 1) * 0.4;
+  const count = MONSTER_BASE + (lvl - 1) * MONSTERS_PER_LEVEL + Math.max(0, Math.round((dm - 1) * 6));
   for (let i = 0; i < count && floorTiles.length; i++) {
     const c = floorTiles.splice(Math.floor(Math.random() * floorTiles.length), 1)[0];
     const kind = MONSTER_KINDS[i % MONSTER_KINDS.length];
-    monsters.push(new Monster3D(scene, grid, { ...kind, tx: c.x, ty: c.y }));
+    const hp = Math.max(kind.hp, Math.round(kind.hp * tierHp));
+    monsters.push(new Monster3D(scene, grid, { ...kind, hp, tx: c.x, ty: c.y }));
   }
   window.__three_monsters = monsters;
+
+  // Пикапы: ракетница (если ещё нет) + бомбы — на floor-тайлах средней
+  // дистанции от входа, чтобы их находили по ходу.
+  const midTiles = [];
+  for (let y = 1; y < GRID_H - 1; y++)
+    for (let x = 1; x < GRID_W - 1; x++) {
+      if (grid[y][x] !== TILE.FLOOR) continue;
+      const d = Math.hypot(x + 0.5 - spawn.x, y + 0.5 - spawn.y);
+      if (d >= 3 && d <= 10) midTiles.push({ x, y });
+    }
+  const takeTile = () => midTiles.length
+    ? midTiles.splice(Math.floor(Math.random() * midTiles.length), 1)[0] : null;
+  if (!hasRocket) { const c = takeTile(); if (c) spawnPickup('rocket', c.x, c.y); }
+  const bombDrops = 1 + (lvl % 2);   // 1-2 сумки бомб на уровень
+  for (let i = 0; i < bombDrops; i++) { const c = takeTile(); if (c) spawnPickup('bomb', c.x, c.y); }
+
   updateHud();
 }
 
@@ -141,6 +189,7 @@ function damagePlayer(now) {
   if (dead || won || now < hurtUntil) return;
   hurtUntil = now + TOUCH_IFRAMES_MS;
   hp -= 1;
+  difficulty.trackDamage(now);
   updateHud();
   Sound3D.hurt();
   flashEl.style.opacity = '1';
@@ -164,6 +213,7 @@ function reachExit() {
 
 // ---- Оружие ----
 function fireRocket(now) {
+  if (!hasRocket) return;
   if (now < nextRocketAt) return;
   nextRocketAt = now + ROCKET_CD_MS;
   const dir = new THREE.Vector3();
@@ -190,7 +240,7 @@ function explode(pos, opts = {}) {
     if (m.dead) continue;
     const dx = m.sprite.position.x - pos.x, dz = m.sprite.position.z - pos.z;
     if (dx * dx + dz * dz > r2) continue;
-    if (m.takeDamage(dmg)) { kills++; updateHud(); }
+    if (m.takeDamage(dmg)) { kills++; difficulty.trackKill(performance.now()); updateHud(); }
   }
   if (world && world.damageWall) world.damageWall(pos.x, pos.z, radius);
 }
@@ -219,7 +269,7 @@ function shoot(now) {
   if (hits.length) {
     endpoint = hits[0].point.clone();
     const m = monsters.find(mm => mm.sprite === hits[0].object);
-    if (m && m.takeDamage(1)) { kills++; updateHud(); }
+    if (m && m.takeDamage(1)) { kills++; difficulty.trackKill(performance.now()); updateHud(); }
   } else {
     endpoint = muzzle.clone().addScaledVector(dir, 14);
   }
@@ -266,8 +316,8 @@ window.addEventListener('resize', () => {
 });
 
 // дев-доступ
-window.__three = { scene, camera, renderer, get grid() { return grid; }, get world() { return world; } };
-window.__three_dbg = { fireRocket, throwBomb, explode, reachExit, loadLevel };
+window.__three = { scene, camera, renderer, get grid() { return grid; }, get world() { return world; }, get pickups() { return pickups; } };
+window.__three_dbg = { fireRocket, throwBomb, explode, reachExit, loadLevel, get hasRocket() { return hasRocket; }, get bombAmmo() { return bombAmmo; } };
 
 // ---- Запуск ----
 loadLevel(1);
@@ -299,15 +349,36 @@ function animate() {
     if (dx * dx + dz * dz < EXIT_DIST * EXIT_DIST) reachExit();
   }
 
+  // difficulty → скорость монстров (адаптивно, каждый кадр)
+  const diffMul = difficulty.multiplier(now);
+
   // монстры
   for (const m of monsters) {
     if (m.dead) continue;
+    m.speedMul = diffMul;
     m.update(dt, playerTile);
     const dx = m.sprite.position.x - camera.position.x;
     const dz = m.sprite.position.z - camera.position.z;
     if (dx * dx + dz * dz < TOUCH_DIST * TOUCH_DIST) damagePlayer(now);
   }
   monsters = monsters.filter(m => !m.dead);
+
+  // пикапы: парят + подбираются по дистанции
+  for (const p of pickups) {
+    p.mesh.position.y = p.bobBase + Math.sin(now * 0.004) * 0.08;
+    p.mesh.rotation.y += dt * 2;
+    const dx = p.mesh.position.x - camera.position.x;
+    const dz = p.mesh.position.z - camera.position.z;
+    if (dx * dx + dz * dz < PICKUP_DIST * PICKUP_DIST) {
+      if (p.type === 'rocket') { hasRocket = true; nextRocketAt = 0; }
+      else { bombAmmo += BOMBS_PER_PICKUP; }
+      Sound3D.step();
+      p.mesh.removeFromParent();
+      p.taken = true;
+      updateHud();
+    }
+  }
+  pickups = pickups.filter(p => !p.taken);
 
   // ракеты
   for (const r of rockets) {
@@ -346,8 +417,10 @@ function animate() {
     camera.position.x += sx; camera.position.y += sy; camera.position.z += sz;
   }
 
-  rocketStateEl.textContent = now >= nextRocketAt ? 'готова' : `${((nextRocketAt - now) / 1000).toFixed(1)}с`;
+  rocketStateEl.textContent = !hasRocket ? 'нет'
+    : (now >= nextRocketAt ? 'готова' : `${((nextRocketAt - now) / 1000).toFixed(1)}с`);
   bombCountEl.textContent = bombAmmo;
+  diffEl.textContent = `Сложность ×${diffMul.toFixed(2)}`;
 
   // viewmodel: bob при ходьбе + затухающий recoil; факел мерцает
   vmRecoil += (0 - vmRecoil) * Math.min(1, dt * 12);

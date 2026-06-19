@@ -43,6 +43,7 @@ export class Monster3D {
 
     this.target = null;
     this.repathMs = 0;
+    this.speedMul = 1;   // множитель скорости от difficulty engine
     // процедурный bob (кадров анимации в 0x72 нет — оживляем покачиванием)
     this.bobT = Math.random() * Math.PI * 2;
   }
@@ -71,7 +72,7 @@ export class Monster3D {
       if (d < 0.05) {
         this.target = null;
       } else {
-        const step = Math.min(d, this.speed * dt);
+        const step = Math.min(d, this.speed * this.speedMul * dt);
         p.x += (dx / d) * step;
         p.z += (dz / d) * step;
         moving = true;
