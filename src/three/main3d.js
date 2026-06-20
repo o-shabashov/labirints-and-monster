@@ -8,6 +8,7 @@ import { Monster3D, MONSTER_KINDS } from './Monster3D.js';
 import { Rocket3D, Bomb3D, spawnExplosion, spawnSparks } from './Weapons3D.js';
 import { Sound3D } from './Sound3D.js';
 import { Difficulty } from '../systems/Difficulty.js';
+import { rocketPickupTexture, bombPickupTexture } from './Textures3D.js';
 
 const EYE_H = 0.55;
 const MONSTER_BASE = 8;
@@ -107,24 +108,14 @@ function clearLevel() {
   if (world) { scene.remove(world.group); world = null; }
 }
 
-// Пикап-объект на floor-тайле: парящий светящийся предмет.
+// Пикап-объект на floor-тайле: парящий billboard-спрайт с icon-текстурой.
 function spawnPickup(type, tx, ty) {
-  let mesh;
-  if (type === 'rocket') {
-    mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.12, 0.4, 10),
-      new THREE.MeshBasicMaterial({ color: 0xff7043 }),
-    );
-    mesh.rotation.z = Math.PI / 2;
-  } else { // bomb
-    mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 12, 12),
-      new THREE.MeshBasicMaterial({ color: 0xffd54f }),
-    );
-  }
-  mesh.position.set(tx + 0.5, 0.4, ty + 0.5);
+  const tex = type === 'rocket' ? rocketPickupTexture() : bombPickupTexture();
+  const mesh = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  mesh.scale.set(0.5, 0.5, 1);
+  mesh.position.set(tx + 0.5, 0.45, ty + 0.5);
   scene.add(mesh);
-  pickups.push({ mesh, type, bobBase: 0.4 });
+  pickups.push({ mesh, type, bobBase: 0.45 });
 }
 
 function loadLevel(lvl) {
@@ -503,9 +494,13 @@ function animate() {
   const bob = walking ? Math.sin(walkPhase) * 7 : 0;
   viewmodelEl.style.transform = `translateY(${bob + vmRecoil}px)`;
   torch.intensity = 2.2 + Math.sin(now * 0.012) * 0.2 + (Math.random() - 0.5) * 0.12;
-  // мерцание настенных факелов
+  // мерцание настенных факелов — свет + пульсация пламени-спрайта
   if (world && world.torchLights) {
     for (const L of world.torchLights) L.intensity = L.userData.baseI + (Math.random() - 0.5) * 0.4;
+  }
+  if (world && world.torchFlames) {
+    const fl = 1 + Math.sin(now * 0.02) * 0.12 + (Math.random() - 0.5) * 0.1;
+    for (const f of world.torchFlames) f.scale.set(0.32 * fl, 0.42 * (0.9 + fl * 0.15), 1);
   }
 
   renderer.render(scene, camera);

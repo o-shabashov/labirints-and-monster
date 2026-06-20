@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { TILE, isBlockingTile } from '../config/constants.js';
+import { flameTexture } from './Textures3D.js';
 
 // Строит 3D-геометрию мира из 2D-сетки лабиринта.
 //
@@ -134,25 +135,40 @@ export function buildWorld(scene, grid) {
       if (wallDir) torchCands.push({ x, y, wallDir });
     }
   }
-  // прорежаем: min расстояние 4 тайла, максимум 14 факелов
+  // прорежаем: min расстояние 4 тайла, максимум 14 факелов.
+  // Факел = тёмная рукоять (cylinder) на стене + billboard-пламя + свет.
   const torchLights = [];
+  const torchFlames = [];
+  const flameTex = flameTexture();
   const placed = [];
   for (const c of torchCands) {
     if (placed.length >= 14) break;
     if (placed.some(p => Math.hypot(p.x - c.x, p.y - c.y) < 4)) continue;
     if (Math.random() < 0.45) continue;   // разрядим случайно
     placed.push(c);
-    const ox = c.x + 0.5 + c.wallDir.dx * 0.38;
-    const oz = c.y + 0.5 + c.wallDir.dz * 0.38;
-    const orb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.07, 8, 8),
-      new THREE.MeshBasicMaterial({ color: 0xffb866 }),
+    const ox = c.x + 0.5 + c.wallDir.dx * 0.4;
+    const oz = c.y + 0.5 + c.wallDir.dz * 0.4;
+    // рукоять — короткий тёмный стержень, торчит из стены под углом вверх
+    const handle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.03, 0.28, 6),
+      new THREE.MeshLambertMaterial({ color: 0x3b2a1a }),
     );
-    orb.position.set(ox, 0.62, oz);
-    group.add(orb);
-    const light = new THREE.PointLight(0xffa64d, 1.3, 4.5, 1.4);
-    light.position.set(ox, 0.62, oz);
-    light.userData.baseI = 1.3;
+    handle.position.set(ox, 0.56, oz);
+    handle.rotation.z = -c.wallDir.dx * 0.5;
+    handle.rotation.x = c.wallDir.dz * 0.5;
+    group.add(handle);
+    // пламя — billboard-спрайт над рукоятью
+    const flame = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: flameTex, transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }));
+    flame.scale.set(0.32, 0.42, 1);
+    flame.position.set(ox, 0.74, oz);
+    group.add(flame);
+    torchFlames.push(flame);
+    const light = new THREE.PointLight(0xffa64d, 1.4, 4.8, 1.4);
+    light.position.set(ox, 0.74, oz);
+    light.userData.baseI = 1.4;
     group.add(light);
     torchLights.push(light);
   }
@@ -176,5 +192,5 @@ export function buildWorld(scene, grid) {
     group.add(exitLight);
   }
 
-  return { group, wallMesh, solidMesh, exit, damageWall, torchLights };
+  return { group, wallMesh, solidMesh, exit, damageWall, torchLights, torchFlames };
 }
