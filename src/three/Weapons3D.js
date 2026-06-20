@@ -145,3 +145,36 @@ export function spawnExplosion(scene, pos, opts = {}) {
   }
   return tick;
 }
+
+// Лёгкие искры от попадания по монстру — без света, дёшево (можно часто).
+const _sparkGeo = new THREE.SphereGeometry(0.05, 5, 5);
+export function spawnSparks(scene, pos, opts = {}) {
+  const count = opts.count ?? 8;
+  const color = opts.color ?? 0xfff176;
+  const spread = opts.spread ?? 1.4;
+  const sparks = [];
+  for (let i = 0; i < count; i++) {
+    const m = new THREE.Mesh(_sparkGeo, new THREE.MeshBasicMaterial({ color, transparent: true }));
+    m.position.copy(pos);
+    const dir = new THREE.Vector3(
+      Math.random() * 2 - 1, Math.random() * 1.5 - 0.3, Math.random() * 2 - 1,
+    ).normalize().multiplyScalar(spread * (0.5 + Math.random()));
+    scene.add(m);
+    sparks.push({ m, dir });
+  }
+  let t = 0; const DUR = 0.3;
+  return function tick(dt) {
+    t += dt;
+    const k = t / DUR;
+    for (const s of sparks) {
+      s.m.position.addScaledVector(s.dir, dt);
+      s.m.material.opacity = Math.max(0, 1 - k);
+      s.m.scale.setScalar(Math.max(0.1, 1 - k));
+    }
+    if (t >= DUR) {
+      for (const s of sparks) { s.m.removeFromParent(); s.m.material.dispose(); }
+      return true;
+    }
+    return false;
+  };
+}

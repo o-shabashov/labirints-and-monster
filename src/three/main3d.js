@@ -5,7 +5,7 @@ import { GRID_W, GRID_H, TILE } from '../config/constants.js';
 import { buildWorld } from './World3D.js';
 import { FpsControls } from './FpsControls.js';
 import { Monster3D, MONSTER_KINDS } from './Monster3D.js';
-import { Rocket3D, Bomb3D, spawnExplosion } from './Weapons3D.js';
+import { Rocket3D, Bomb3D, spawnExplosion, spawnSparks } from './Weapons3D.js';
 import { Sound3D } from './Sound3D.js';
 import { Difficulty } from '../systems/Difficulty.js';
 
@@ -257,7 +257,11 @@ function explode(pos, opts = {}) {
     if (m.dead) continue;
     const dx = m.sprite.position.x - pos.x, dz = m.sprite.position.z - pos.z;
     if (dx * dx + dz * dz > r2) continue;
-    if (m.takeDamage(dmg)) { kills++; difficulty.trackKill(performance.now()); updateHud(); }
+    const mp = m.sprite.position.clone();
+    if (m.takeDamage(dmg, pos.x, pos.z)) {
+      kills++; difficulty.trackKill(performance.now()); updateHud();
+      explosions.push(spawnSparks(scene, mp, { count: 16, color: 0xff8844, spread: 2.4 }));
+    }
   }
   if (world && world.damageWall) world.damageWall(pos.x, pos.z, radius);
 }
@@ -286,7 +290,14 @@ function shoot(now) {
   if (hits.length) {
     endpoint = hits[0].point.clone();
     const m = monsters.find(mm => mm.sprite === hits[0].object);
-    if (m && m.takeDamage(1)) { kills++; difficulty.trackKill(performance.now()); updateHud(); }
+    if (m) {
+      const mp = m.sprite.position.clone();
+      explosions.push(spawnSparks(scene, mp, { count: 8, color: 0xfff176, spread: 1.2 }));
+      if (m.takeDamage(1, camera.position.x, camera.position.z)) {
+        kills++; difficulty.trackKill(performance.now()); updateHud();
+        explosions.push(spawnSparks(scene, mp, { count: 18, color: 0xff8844, spread: 2.4 }));
+      }
+    }
   } else {
     endpoint = muzzle.clone().addScaledVector(dir, 14);
   }

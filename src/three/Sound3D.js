@@ -71,6 +71,20 @@ export const Sound3D = {
     n.start(t); n.stop(t + 0.3);
   },
 
+  // звонкий «чпок» попадания по монстру
+  hit() {
+    const c = ctx(); if (!c) return;
+    const t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(440, t);
+    o.frequency.exponentialRampToValueAtTime(140, t + 0.08);
+    g.gain.setValueAtTime(0.14, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t + 0.08);
+  },
+
   // глухой удар при получении урона
   hurt() {
     const c = ctx(); if (!c) return;

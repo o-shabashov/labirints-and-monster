@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { bfsNextStep } from '../systems/PathFinding.js';
+import { isBlockingTile } from '../config/constants.js';
+import { Sound3D } from './Sound3D.js';
 
 // Монстр в 3D — billboard-спрайт (THREE.Sprite всегда повёрнут к камере).
 // Использует те же 0x72-текстуры что и 2D-версия и тот же BFS-pathfinding
@@ -36,6 +38,8 @@ export class Monster3D {
     });
     this.sprite = new THREE.Sprite(mat);
     const s = opts.scale ?? 0.7;
+    this.baseScaleX = s;
+    this.baseScaleY = s * 1.3;
     this.sprite.scale.set(s, s * 1.3, 1);   // выше чем шире — человекоформа
     this.baseY = s * 0.65;
     this.sprite.position.set(opts.tx + 0.5, this.baseY, opts.ty + 0.5);
@@ -56,6 +60,15 @@ export class Monster3D {
     this.speedMul = 1;   // множитель скорости от difficulty engine
     // процедурный bob (кадров анимации в 0x72 нет — оживляем покачиванием)
     this.bobT = Math.random() * Math.PI * 2;
+    // импакт от попаданий
+    this.knockX = 0; this.knockZ = 0;   // скорость отброса (затухает)
+    this.flashUntil = 0;
+    this.punchT = 0;
+  }
+
+  _blockedAt(x, z) {
+    const tx = Math.floor(x), tz = Math.floor(z);
+    return tx < 0 || tz < 0 || tx >= this.w || tz >= this.h || isBlockingTile(this.grid[tz][tx]);
   }
 
   tilePos() {
@@ -88,19 +101,56 @@ export class Monster3D {
         moving = true;
       }
     }
+    // отброс от попадания — затухает, не проходит сквозь стены
+    if (this.knockX !== 0 || this.knockZ !== 0) {
+      const p = this.sprite.position;
+      const nx = p.x + this.knockX * dt, nz = p.z + this.knockZ * dt;
+      if (!this._blockedAt(nx, p.z)) p.x = nx;
+      if (!this._blockedAt(p.x, nz)) p.z = nz;
+      const decay = Math.max(0, 1 - dt * 9);
+      this.knockX *= decay; this.knockZ *= decay;
+      if (Math.abs(this.knockX) < 0.02 && Math.abs(this.knockZ) < 0.02) { this.knockX = 0; this.knockZ = 0; }
+    }
+
     // bob — покачивание вверх-вниз, быстрее при движении
     this.bobT += dt * (moving ? 9 : 3);
     this.sprite.position.y = this.baseY + Math.sin(this.bobT) * 0.05;
+
+    // scale-punch при попадании — раздувается и опадает
+    let punchMul = 1;
+    if (this.punchT > 0) {
+      this.punchT = Math.max(0, this.punchT - dt);
+      punchMul = 1 + (this.punchT / 0.16) * 0.35;
+    }
+    this.sprite.scale.set(this.baseScaleX * punchMul, this.baseScaleY * punchMul, 1);
+
+    // сброс вспышки
+    if (this.flashUntil && performance.now() > this.flashUntil) {
+      this.sprite.material.color.setHex(0xffffff);
+      this.flashUntil = 0;
+    }
+
     // тень следует за позицией (на полу, фикс. высота)
     this.shadow.position.x = this.sprite.position.x;
     this.shadow.position.z = this.sprite.position.z;
   }
 
-  takeDamage(n) {
+  // fromX/fromZ — источник урона, для отброса в противоположную сторону.
+  takeDamage(n, fromX, fromZ) {
     this.hp -= n;
-    // короткая вспышка-тинт при попадании
-    this.sprite.material.color.setHex(0xff8080);
-    setTimeout(() => { if (!this.dead) this.sprite.material.color.setHex(0xffffff); }, 90);
+    // яркая вспышка + scale-punch
+    this.sprite.material.color.setHex(0xff3030);
+    this.flashUntil = performance.now() + 120;
+    this.punchT = 0.16;
+    Sound3D.hit();
+    // отброс от источника
+    if (fromX !== undefined) {
+      const dx = this.sprite.position.x - fromX, dz = this.sprite.position.z - fromZ;
+      const d = Math.hypot(dx, dz) || 1;
+      const KB = 3.2;
+      this.knockX += (dx / d) * KB;
+      this.knockZ += (dz / d) * KB;
+    }
     if (this.hp <= 0) { this.kill(); return true; }
     return false;
   }
