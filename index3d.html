@@ -57,7 +57,7 @@
     #gunView {
       position: absolute; right: -30px; bottom: 6px;
       width: 460px; height: 150px; display: none;
-      background-image: url('assets/weapons3d/shotgun.png');
+      background-image: url('assets/weapons3d/pistol.png');
       background-size: contain; background-repeat: no-repeat; background-position: bottom right;
       transform: rotate(-7deg);
       filter: drop-shadow(-6px 4px 8px rgba(0,0,0,0.55));
@@ -113,13 +113,15 @@
   <div id="crosshair"></div>
   <!-- компас к выходу + вводная подсказка -->
   <div id="compass"><span id="compassArrow">⬆</span><span id="compassDist"></span></div>
-  <div id="introhint">Найди светящийся <b>жёлтый выход</b> · ЛКМ — стрелять · подбери <b>ракетницу</b> и <b>бомбы</b></div>
+  <div id="introhint">Найди <b>жёлтый выход</b> · ЛКМ — огонь · <b>1–5</b> — оружие · подбери <b>ракету</b> и <b>гранаты</b></div>
   <div id="hud">
     HP: <span id="hp">♥♥♥</span><span id="killcnt"></span><span id="lvl"></span>
     <div id="hotbar">
-      <span class="slot active" data-w="gun"><b>1</b> Дробовик</span>
-      <span class="slot locked" data-w="rocket"><b>2</b> 🚀 Ракета<span id="hbRocket"></span></span>
-      <span class="slot locked" data-w="bomb"><b>3</b> 💣 Бомба<span id="hbBomb"></span></span>
+      <span class="slot active" data-w="pistol"><b>1</b> Пистолет</span>
+      <span class="slot" data-w="shotgun"><b>2</b> Дробовик</span>
+      <span class="slot" data-w="smg"><b>3</b> Автомат</span>
+      <span class="slot locked" data-w="rocket"><b>4</b> 🚀 Ракета<span id="hbRocket"></span></span>
+      <span class="slot locked" data-w="bomb"><b>5</b> 💣 Граната<span id="hbBomb"></span></span>
       <span id="diff">Сложность ×1.0</span>
     </div>
   </div>
@@ -135,6 +137,6 @@
     <p>ЛКМ — стрельба · Esc — освободить курсор</p>
     <p class="go">Кликни, чтобы войти</p>
   </div>
-  <script type="module" src="./src/three/main3d.js?v=3d15"></script>
+  <script type="module" src="./src/three/main3d.js?v=3d16"></script>
 </body>
 </html>

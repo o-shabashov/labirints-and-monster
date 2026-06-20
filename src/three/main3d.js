@@ -8,7 +8,7 @@ import { Monster3D, MONSTER_KINDS } from './Monster3D.js';
 import { Rocket3D, Bomb3D, spawnExplosion, spawnSparks } from './Weapons3D.js';
 import { Sound3D } from './Sound3D.js';
 import { Difficulty } from '../systems/Difficulty.js';
-import { rocketPickupTexture, bombPickupTexture } from './Textures3D.js';
+import { rocketPickupTexture } from './Textures3D.js';
 
 const EYE_H = 0.55;
 const MONSTER_BASE = 8;
@@ -34,12 +34,20 @@ const flashEl = document.getElementById('flash');
 const diffEl = document.getElementById('diff');
 const hbRocketEl = document.getElementById('hbRocket');
 const hbBombEl = document.getElementById('hbBomb');
-const slotEls = {
-  gun:    document.querySelector('.slot[data-w="gun"]'),
-  rocket: document.querySelector('.slot[data-w="rocket"]'),
-  bomb:   document.querySelector('.slot[data-w="bomb"]'),
+const slotEls = {};
+document.querySelectorAll('.slot').forEach(el => { slotEls[el.dataset.w] = el; });
+let currentWeapon = 'pistol';
+let mouseHeld = false;
+
+// Таблица оружия. kind: hit (hitscan-картечь) | rocket | bomb. img — спрайт
+// для viewmodel в assets/weapons3d/; null → посох мага.
+const WEAPONS = {
+  pistol:  { name: 'Пистолет', img: 'pistol.png',  kind: 'hit', cd: 170, pellets: 1, spread: 0.004, recoil: 18, auto: false, sound: 'shoot' },
+  shotgun: { name: 'Дробовик', img: 'shotgun.png', kind: 'hit', cd: 520, pellets: 8, spread: 0.075, recoil: 44, auto: false, sound: 'shotgun' },
+  smg:     { name: 'Автомат',  img: 'smg.png',     kind: 'hit', cd: 85,  pellets: 1, spread: 0.022, recoil: 14, auto: true,  sound: 'shoot' },
+  rocket:  { name: 'Ракета',   img: null,          kind: 'rocket' },
+  bomb:    { name: 'Граната',  img: 'grenade.png', kind: 'bomb' },
 };
-let currentWeapon = 'gun';
 const viewmodelEl = document.getElementById('viewmodel');
 const staffEl = document.getElementById('staff');
 const gunViewEl = document.getElementById('gunView');   // фон-дробовик задан в CSS (CC0-спрайт)
@@ -110,9 +118,13 @@ function clearLevel() {
   if (world) { scene.remove(world.group); world = null; }
 }
 
+// граната-текстура для пикапа бомбы (CC0-спрайт)
+const _grenadeTex = new THREE.TextureLoader().load('assets/weapons3d/grenade.png');
+_grenadeTex.colorSpace = THREE.SRGBColorSpace;
+
 // Пикап-объект на floor-тайле: парящий billboard-спрайт с icon-текстурой.
 function spawnPickup(type, tx, ty) {
-  const tex = type === 'rocket' ? rocketPickupTexture() : bombPickupTexture();
+  const tex = type === 'rocket' ? rocketPickupTexture() : _grenadeTex;
   const mesh = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
   mesh.scale.set(0.5, 0.5, 1);
   mesh.position.set(tx + 0.5, 0.45, ty + 0.5);
@@ -265,26 +277,25 @@ const SCREEN_CENTER = new THREE.Vector2(0, 0);
 const TRACER_GEO = new THREE.SphereGeometry(0.05, 6, 6);
 const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xfff176 });
 let nextShotAt = 0;
-function shoot(now) {
+// Универсальный hitscan-выстрел: opts.pellets картечин с разбросом spread.
+// pellets=1 spread~0 → одиночный (пистолет/автомат); pellets=8 → дробовик.
+function fireHitscan(now, opts) {
   if (now < nextShotAt) return;
-  // Дробовик: PELLETS картечин веером. Урон 1/картечина — мощно вблизи
-  // (все попадают), слабо вдали (разлёт мимо). Медленная перезарядка.
-  nextShotAt = now + 520;
-  Sound3D.shotgun();
-  vmRecoil = 44;
-  crosshair.style.transform = 'translate(-50%,-50%) scale(2.4)';
-  setTimeout(() => { crosshair.style.transform = 'translate(-50%,-50%)'; }, 100);
+  nextShotAt = now + opts.cd;
+  (opts.sound === 'shotgun' ? Sound3D.shotgun : Sound3D.shoot)();
+  vmRecoil = opts.recoil;
+  const cs = 1.4 + opts.spread * 18;
+  crosshair.style.transform = `translate(-50%,-50%) scale(${cs})`;
+  setTimeout(() => { crosshair.style.transform = 'translate(-50%,-50%)'; }, opts.cd > 300 ? 100 : 50);
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
   const muzzle = camera.position.clone().addScaledVector(dir, 0.35);
   muzzle.y -= 0.06;
-  const PELLETS = 8;
-  const SPREAD = 0.075;   // разброс в NDC
   const live = monsters.filter(m => !m.dead).map(m => m.sprite);
   const counted = new Set();
-  for (let i = 0; i < PELLETS; i++) {
-    const sx = (Math.random() * 2 - 1) * SPREAD;
-    const sy = (Math.random() * 2 - 1) * SPREAD;
+  for (let i = 0; i < opts.pellets; i++) {
+    const sx = (Math.random() * 2 - 1) * opts.spread;
+    const sy = (Math.random() * 2 - 1) * opts.spread;
     raycaster.setFromCamera(new THREE.Vector2(sx, sy), camera);
     const hits = raycaster.intersectObjects(live, false);
     let endpoint;
@@ -312,25 +323,36 @@ function shoot(now) {
 
 // ---- Выбор оружия ----
 function selectWeapon(w) {
+  if (!WEAPONS[w]) return;
   if (w === 'rocket' && !hasRocket) return;   // ракетница ещё не подобрана
+  if (w === 'bomb' && bombAmmo <= 0) return;  // гранат нет
   currentWeapon = w;
   refreshHotbar();
 }
 function fireCurrent(now) {
-  if (currentWeapon === 'gun') shoot(now);
-  else if (currentWeapon === 'rocket') fireRocket(now);
-  else if (currentWeapon === 'bomb') { throwBomb(); if (bombAmmo <= 0) selectWeapon('gun'); }
+  const def = WEAPONS[currentWeapon];
+  if (def.kind === 'hit') fireHitscan(now, def);
+  else if (def.kind === 'rocket') fireRocket(now);
+  else if (def.kind === 'bomb') { throwBomb(); if (bombAmmo <= 0) selectWeapon('pistol'); }
 }
 function refreshHotbar() {
-  slotEls.gun.classList.toggle('active', currentWeapon === 'gun');
-  slotEls.rocket.classList.toggle('active', currentWeapon === 'rocket');
-  slotEls.bomb.classList.toggle('active', currentWeapon === 'bomb');
-  slotEls.rocket.classList.toggle('locked', !hasRocket);
-  slotEls.bomb.classList.toggle('locked', bombAmmo <= 0);
-  // viewmodel: дробовик для пушки, посох для ракеты/бомбы
-  const gun = currentWeapon === 'gun';
-  gunViewEl.style.display = gun ? 'block' : 'none';
-  staffEl.style.display = gun ? 'none' : 'block';
+  for (const w in slotEls) {
+    slotEls[w].classList.toggle('active', currentWeapon === w);
+    let locked = false;
+    if (w === 'rocket') locked = !hasRocket;
+    else if (w === 'bomb') locked = bombAmmo <= 0;
+    slotEls[w].classList.toggle('locked', locked);
+  }
+  // viewmodel: спрайт оружия (assets/weapons3d) или посох (ракета)
+  const def = WEAPONS[currentWeapon];
+  if (def.img) {
+    gunViewEl.style.backgroundImage = `url('assets/weapons3d/${def.img}')`;
+    gunViewEl.style.display = 'block';
+    staffEl.style.display = 'none';
+  } else {
+    gunViewEl.style.display = 'none';
+    staffEl.style.display = 'block';
+  }
 }
 
 // ---- Ввод ----
@@ -364,17 +386,20 @@ controls.addEventListener('unlock', () => {
 });
 window.addEventListener('mousedown', (e) => {
   if (!controls.isLocked) return;
-  if (e.button === 0) fireCurrent(performance.now());        // ЛКМ — текущее оружие
+  if (e.button === 0) { mouseHeld = true; fireCurrent(performance.now()); }  // ЛКМ — текущее оружие
   else if (e.button === 2) { selectWeapon('rocket'); fireRocket(performance.now()); } // ПКМ — ракета
 });
+window.addEventListener('mouseup', (e) => { if (e.button === 0) mouseHeld = false; });
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('keydown', (e) => {
   if (!controls.isLocked) return;
-  if (e.code === 'Digit1') selectWeapon('gun');
-  else if (e.code === 'Digit2') selectWeapon('rocket');
-  else if (e.code === 'Digit3') selectWeapon('bomb');
+  if (e.code === 'Digit1') selectWeapon('pistol');
+  else if (e.code === 'Digit2') selectWeapon('shotgun');
+  else if (e.code === 'Digit3') selectWeapon('smg');
+  else if (e.code === 'Digit4') selectWeapon('rocket');
+  else if (e.code === 'Digit5') selectWeapon('bomb');
   else if (e.code === 'KeyQ') { selectWeapon('rocket'); fireRocket(performance.now()); }
-  else if (e.code === 'KeyF') { selectWeapon('bomb'); throwBomb(); if (bombAmmo <= 0) selectWeapon('gun'); }
+  else if (e.code === 'KeyF') { selectWeapon('bomb'); throwBomb(); if (bombAmmo <= 0) selectWeapon('pistol'); }
 });
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -395,6 +420,8 @@ function animate() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const now = performance.now();
   if (controls.isLocked && !dead && !won) fps.update(dt);
+  // авто-огонь (автомат) — стрельба удержанием ЛКМ
+  if (controls.isLocked && mouseHeld && !dead && !won && WEAPONS[currentWeapon].auto) fireCurrent(now);
   torch.position.copy(camera.position);
 
   // движение игрока за кадр → шаги + bob viewmodel
