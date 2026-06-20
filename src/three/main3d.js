@@ -10,8 +10,8 @@ import { Sound3D } from './Sound3D.js';
 import { Difficulty } from '../systems/Difficulty.js';
 
 const EYE_H = 0.55;
-const MONSTER_BASE = 14;
-const MONSTERS_PER_LEVEL = 3;
+const MONSTER_BASE = 8;
+const MONSTERS_PER_LEVEL = 2;
 const MAX_LEVELS = 5;
 const TOUCH_DIST = 0.5;
 const TOUCH_IFRAMES_MS = 900;
@@ -161,7 +161,7 @@ function loadLevel(lvl) {
   // Difficulty влияет на число монстров; уровень — на их HP (tier).
   const dm = difficulty.multiplier(performance.now());
   const tierHp = 1 + (lvl - 1) * 0.4;
-  const count = MONSTER_BASE + (lvl - 1) * MONSTERS_PER_LEVEL + Math.max(0, Math.round((dm - 1) * 6));
+  const count = MONSTER_BASE + (lvl - 1) * MONSTERS_PER_LEVEL + Math.max(0, Math.round((dm - 1) * 3));
   for (let i = 0; i < count && floorTiles.length; i++) {
     const c = floorTiles.splice(Math.floor(Math.random() * floorTiles.length), 1)[0];
     const kind = MONSTER_KINDS[i % MONSTER_KINDS.length];
@@ -270,7 +270,7 @@ const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xfff176 });
 let nextShotAt = 0;
 function shoot(now) {
   if (now < nextShotAt) return;
-  nextShotAt = now + 250;
+  nextShotAt = now + 110;
   Sound3D.shoot();
   vmRecoil = 24;
   crosshair.style.transform = 'translate(-50%,-50%) scale(1.5)';
