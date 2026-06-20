@@ -51,8 +51,14 @@
     }
     /* viewmodel — посох, привязан снизу-справа, бобает через --bob */
     #viewmodel {
-      position: fixed; right: 16%; bottom: -2%; z-index: 5; display: none;
-      pointer-events: none; transform: translateY(var(--bob, 0px)) translateY(var(--recoil, 0px));
+      position: fixed; right: 12%; bottom: -2%; z-index: 5; display: none;
+      pointer-events: none;
+    }
+    #gunView {
+      position: absolute; right: -40px; bottom: 0;
+      width: 340px; height: 240px; display: none;
+      background-size: contain; background-repeat: no-repeat; background-position: bottom right;
+      filter: drop-shadow(-8px 0 10px rgba(0,0,0,0.5));
     }
     #staff {
       width: 26px; height: 340px; border-radius: 13px;
@@ -109,7 +115,7 @@
   <div id="hud">
     HP: <span id="hp">♥♥♥</span><span id="killcnt"></span><span id="lvl"></span>
     <div id="hotbar">
-      <span class="slot active" data-w="gun"><b>1</b> Пушка</span>
+      <span class="slot active" data-w="gun"><b>1</b> Дробовик</span>
       <span class="slot locked" data-w="rocket"><b>2</b> 🚀 Ракета<span id="hbRocket"></span></span>
       <span class="slot locked" data-w="bomb"><b>3</b> 💣 Бомба<span id="hbBomb"></span></span>
       <span id="diff">Сложность ×1.0</span>
@@ -119,6 +125,7 @@
   <!-- viewmodel: посох мага снизу-справа (игрок — wizard) -->
   <div id="viewmodel">
     <div id="staff"><div id="stafftip"></div></div>
+    <div id="gunView"></div>
   </div>
   <div id="overlay">
     <h1>LABIRINTS 3D</h1>
@@ -126,6 +133,6 @@
     <p>ЛКМ — стрельба · Esc — освободить курсор</p>
     <p class="go">Кликни, чтобы войти</p>
   </div>
-  <script type="module" src="./src/three/main3d.js?v=3d13"></script>
+  <script type="module" src="./src/three/main3d.js?v=3d14"></script>
 </body>
 </html>

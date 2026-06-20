@@ -71,6 +71,33 @@ export const Sound3D = {
     n.start(t); n.stop(t + 0.3);
   },
 
+  // выстрел дробовика — шумовой burst + низкий удар
+  shotgun() {
+    const c = ctx(); if (!c) return;
+    const t = c.currentTime;
+    const len = Math.floor(c.sampleRate * 0.18);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const n = c.createBufferSource(); n.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(2000, t);
+    f.frequency.exponentialRampToValueAtTime(300, t + 0.15);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.34, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    n.connect(f).connect(g).connect(c.destination);
+    n.start(t); n.stop(t + 0.18);
+    const o = c.createOscillator(), og = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(150, t);
+    o.frequency.exponentialRampToValueAtTime(48, t + 0.14);
+    og.gain.setValueAtTime(0.3, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+    o.connect(og).connect(c.destination);
+    o.start(t); o.stop(t + 0.14);
+  },
+
   // звонкий «чпок» попадания по монстру
   hit() {
     const c = ctx(); if (!c) return;

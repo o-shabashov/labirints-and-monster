@@ -8,7 +8,7 @@ import { Monster3D, MONSTER_KINDS } from './Monster3D.js';
 import { Rocket3D, Bomb3D, spawnExplosion, spawnSparks } from './Weapons3D.js';
 import { Sound3D } from './Sound3D.js';
 import { Difficulty } from '../systems/Difficulty.js';
-import { rocketPickupTexture, bombPickupTexture } from './Textures3D.js';
+import { rocketPickupTexture, bombPickupTexture, shotgunDataURL } from './Textures3D.js';
 
 const EYE_H = 0.55;
 const MONSTER_BASE = 8;
@@ -41,6 +41,9 @@ const slotEls = {
 };
 let currentWeapon = 'gun';
 const viewmodelEl = document.getElementById('viewmodel');
+const staffEl = document.getElementById('staff');
+const gunViewEl = document.getElementById('gunView');
+gunViewEl.style.backgroundImage = `url(${shotgunDataURL()})`;
 const compassEl = document.getElementById('compass');
 const compassArrowEl = document.getElementById('compassArrow');
 const compassDistEl = document.getElementById('compassDist');
@@ -265,37 +268,47 @@ const TRACER_MAT = new THREE.MeshBasicMaterial({ color: 0xfff176 });
 let nextShotAt = 0;
 function shoot(now) {
   if (now < nextShotAt) return;
-  nextShotAt = now + 110;
-  Sound3D.shoot();
-  vmRecoil = 24;
-  crosshair.style.transform = 'translate(-50%,-50%) scale(1.5)';
-  setTimeout(() => { crosshair.style.transform = 'translate(-50%,-50%)'; }, 60);
+  // Дробовик: PELLETS картечин веером. Урон 1/картечина — мощно вблизи
+  // (все попадают), слабо вдали (разлёт мимо). Медленная перезарядка.
+  nextShotAt = now + 520;
+  Sound3D.shotgun();
+  vmRecoil = 44;
+  crosshair.style.transform = 'translate(-50%,-50%) scale(2.4)';
+  setTimeout(() => { crosshair.style.transform = 'translate(-50%,-50%)'; }, 100);
   const dir = new THREE.Vector3();
   camera.getWorldDirection(dir);
-  raycaster.setFromCamera(SCREEN_CENTER, camera);
-  const hits = raycaster.intersectObjects(monsters.filter(m => !m.dead).map(m => m.sprite), false);
-  // muzzle чуть ниже-правее центра — будто из посоха
   const muzzle = camera.position.clone().addScaledVector(dir, 0.35);
   muzzle.y -= 0.06;
-  let endpoint;
-  if (hits.length) {
-    endpoint = hits[0].point.clone();
-    const m = monsters.find(mm => mm.sprite === hits[0].object);
-    if (m) {
-      const mp = m.sprite.position.clone();
-      explosions.push(spawnSparks(scene, mp, { count: 8, color: 0xfff176, spread: 1.2 }));
-      if (m.takeDamage(1, camera.position.x, camera.position.z)) {
-        kills++; difficulty.trackKill(performance.now()); updateHud();
-        explosions.push(spawnSparks(scene, mp, { count: 18, color: 0xff8844, spread: 2.4 }));
+  const PELLETS = 8;
+  const SPREAD = 0.075;   // разброс в NDC
+  const live = monsters.filter(m => !m.dead).map(m => m.sprite);
+  const counted = new Set();
+  for (let i = 0; i < PELLETS; i++) {
+    const sx = (Math.random() * 2 - 1) * SPREAD;
+    const sy = (Math.random() * 2 - 1) * SPREAD;
+    raycaster.setFromCamera(new THREE.Vector2(sx, sy), camera);
+    const hits = raycaster.intersectObjects(live, false);
+    let endpoint;
+    if (hits.length) {
+      endpoint = hits[0].point.clone();
+      const m = monsters.find(mm => mm.sprite === hits[0].object);
+      if (m && !m.dead) {
+        const mp = m.sprite.position.clone();
+        explosions.push(spawnSparks(scene, mp, { count: 4, color: 0xfff176, spread: 1.0 }));
+        if (m.takeDamage(1, camera.position.x, camera.position.z) && !counted.has(m)) {
+          counted.add(m);
+          kills++; difficulty.trackKill(performance.now()); updateHud();
+          explosions.push(spawnSparks(scene, mp, { count: 14, color: 0xff8844, spread: 2.2 }));
+        }
       }
+    } else {
+      endpoint = muzzle.clone().addScaledVector(dir, 12);
     }
-  } else {
-    endpoint = muzzle.clone().addScaledVector(dir, 14);
+    const mesh = new THREE.Mesh(TRACER_GEO, TRACER_MAT);
+    mesh.position.copy(muzzle);
+    scene.add(mesh);
+    tracers.push({ mesh, from: muzzle.clone(), to: endpoint, t: 0, dur: 0.08 });
   }
-  const mesh = new THREE.Mesh(TRACER_GEO, TRACER_MAT);
-  mesh.position.copy(muzzle);
-  scene.add(mesh);
-  tracers.push({ mesh, from: muzzle.clone(), to: endpoint, t: 0, dur: 0.09 });
 }
 
 // ---- Выбор оружия ----
@@ -315,6 +328,10 @@ function refreshHotbar() {
   slotEls.bomb.classList.toggle('active', currentWeapon === 'bomb');
   slotEls.rocket.classList.toggle('locked', !hasRocket);
   slotEls.bomb.classList.toggle('locked', bombAmmo <= 0);
+  // viewmodel: дробовик для пушки, посох для ракеты/бомбы
+  const gun = currentWeapon === 'gun';
+  gunViewEl.style.display = gun ? 'block' : 'none';
+  staffEl.style.display = gun ? 'none' : 'block';
 }
 
 // ---- Ввод ----
