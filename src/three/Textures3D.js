@@ -51,42 +51,6 @@ export function rocketPickupTexture() {
   });
 }
 
-// Дробовик для viewmodel (DOM, через data-URL). В 0x72 нет огнестрела —
-// рисуем процедурно. Удерживается снизу-справа, стволы к центру.
-let _shotgunURL = null;
-export function shotgunDataURL() {
-  if (_shotgunURL) return _shotgunURL;
-  const W = 360, H = 240;
-  const cv = document.createElement('canvas');
-  cv.width = W; cv.height = H;
-  const c = cv.getContext('2d');
-  c.clearRect(0, 0, W, H);
-  // стволы + ресивер + цевьё — наклонённый блок, дуло вверх-влево
-  c.save();
-  c.translate(W * 0.6, H * 0.8);
-  c.rotate(-0.6);
-  c.fillStyle = '#3f434b'; c.fillRect(-16, -210, 30, 210);   // двойной ствол
-  c.fillStyle = '#2c2f35'; c.fillRect(-1, -210, 2, 210);     // шов между стволами
-  c.fillStyle = '#23262b'; c.fillRect(-18, -214, 34, 10);    // дульный срез
-  c.fillStyle = '#54585f'; c.fillRect(-20, -6, 40, 54);      // ресивер
-  c.fillStyle = '#6e4a28'; c.fillRect(-17, -66, 34, 30);     // цевьё (дерево)
-  c.fillStyle = '#5a3c20'; c.fillRect(-17, -66, 34, 5);
-  c.fillStyle = '#2c2f35'; c.fillRect(-6, 48, 12, 14);       // скоба
-  c.restore();
-  // приклад (дерево) — отдельно под другим углом
-  c.save();
-  c.translate(W * 0.74, H * 0.74);
-  c.rotate(0.26);
-  c.fillStyle = '#7a5230';
-  c.beginPath();
-  c.moveTo(0, -18); c.lineTo(74, 16); c.lineTo(66, 54); c.lineTo(-6, 14); c.closePath();
-  c.fill();
-  c.fillStyle = '#8a5f38'; c.fillRect(0, -18, 16, 42);
-  c.restore();
-  _shotgunURL = cv.toDataURL();
-  return _shotgunURL;
-}
-
 // Иконка бомбы — чёрный шар, фитиль, искра + glow.
 export function bombPickupTexture() {
   return canvasTex('pk_bomb', (c, s) => {

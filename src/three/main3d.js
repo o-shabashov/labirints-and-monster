@@ -8,7 +8,7 @@ import { Monster3D, MONSTER_KINDS } from './Monster3D.js';
 import { Rocket3D, Bomb3D, spawnExplosion, spawnSparks } from './Weapons3D.js';
 import { Sound3D } from './Sound3D.js';
 import { Difficulty } from '../systems/Difficulty.js';
-import { rocketPickupTexture, bombPickupTexture, shotgunDataURL } from './Textures3D.js';
+import { rocketPickupTexture, bombPickupTexture } from './Textures3D.js';
 
 const EYE_H = 0.55;
 const MONSTER_BASE = 8;
@@ -42,8 +42,7 @@ const slotEls = {
 let currentWeapon = 'gun';
 const viewmodelEl = document.getElementById('viewmodel');
 const staffEl = document.getElementById('staff');
-const gunViewEl = document.getElementById('gunView');
-gunViewEl.style.backgroundImage = `url(${shotgunDataURL()})`;
+const gunViewEl = document.getElementById('gunView');   // фон-дробовик задан в CSS (CC0-спрайт)
 const compassEl = document.getElementById('compass');
 const compassArrowEl = document.getElementById('compassArrow');
 const compassDistEl = document.getElementById('compassDist');
